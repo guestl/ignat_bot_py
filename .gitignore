@@ -116,3 +116,10 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+*.db
+db/sftp-config.json
+ignat_bot.service
+sftp-config.json
+src/config.py
+src/fd.txt
+src/webhook curl.txt
