@@ -13,56 +13,68 @@ from logging.handlers import RotatingFileHandler
 import config
 from ignat_db_helper import ignat_db_helper
 
-import re
-from keyboard_captcha import tg_kb_captcha
-
+from handlers.keyboard_captcha import tg_kb_captcha
+from handlers import is_chineese
 
 user_dict = {}
+waiting_dict = {}
 database = ignat_db_helper()
+
+# Logging module for debugging
+logging.basicConfig(
+                    handlers=[RotatingFileHandler('ignat_bot.log', maxBytes=500000,
+                backupCount=10)],
+            format='%(asctime)s - %(levelname)s - %(lineno)d - %(message)s',
+            level=config.LOGGER_LEVEL)
+
+logger = logging.getLogger(__name__)  # this gets the root logger
+logger.setLevel(config.LOGGER_LEVEL)
 
 
 def load_database_into_memory():
     user_dict = database.get_user_dict()
 
-    logging.debug(user_dict[-1001478270653][66294146])
-    logging.debug(len(user_dict))
+    logger.debug('доверенный ли юзер 66294146 в чате -1001478270653 - %s'
+        % user_dict[-1001478270653][66294146])
+    logger.debug('всего в бд %s чата' % len(user_dict))
+
     for key in user_dict.keys():
-        logging.debug(len(user_dict[key]))
+        logger.debug('в чате %s всего %s пользователей'
+            % (key, len(user_dict[key])))
 
     return user_dict
 
 
 def save_message_text_to_database(userID, userName, userMessageText,
-                                    userMessageCaption, userMessageEntities,
-                                    userMessageCaptionEntities):
-
-    logging.debug('from [%s][%s] was text: %s ' %
-                  (userID, userName, userMessageText))
-
-    logging.debug('from [%s][%s] was caption: %s ' %
-                  (userID, userName, userMessageCaption))
-
-    logging.debug('from [%s][%s] was messageEntities: %s ' %
-                  (userID, userName, userMessageEntities))
-
-    logging.debug('from [%s][%s] was captionEntities: %s ' %
-                  (userID, userName, userMessageCaptionEntities))
+                                  userMessageCaption, userMessageEntities,
+                                  userMessageCaptionEntities):
+    logger.info('from [%s][%s] was text: %s ' %
+                (userID, userName, userMessageText))
+    logger.info('from [%s][%s] was caption: %s ' %
+                (userID, userName, userMessageCaption))
+    logger.info('from [%s][%s] was messageEntities: %s ' %
+                (userID, userName, userMessageEntities))
+    logger.info('from [%s][%s] was captionEntities: %s ' %
+                (userID, userName, userMessageCaptionEntities))
 
 
 def add_user_into_database(chat_id, user_id, is_trusted):
-    pass
+    logger.debug('add_user_into_database (chat_id %s, user_id %s,\
+                 is_trusted %s)' % (chat_id, user_id, is_trusted))
 
 
 def update_user_into_database(chat_id, user_id, is_trusted):
-    pass
+    logger.debug('update_user_into_database (chat_id %s, user_id %s,\
+                 is_trusted %s)' % (chat_id, user_id, is_trusted))
+
+
+def add_user_to_waiting_dict(chat_id, user_id):
+    logger.debug('add_user_to_waiting_dict (chat_id %s, user_id \
+                 %s)' % (chat_id, user_id))
 
 
 def is_Trusted(chat_id, user_id):
     return user_dict[chat_id][user_id]
-
-
-def is_ChineseText(text_to_check):
-    return re.findall(r'[\u4e00-\u9fff]+', text_to_check)
 
 
 def add_Untrusted(chat_id, user_id):
@@ -77,8 +89,9 @@ def set_Trusted(chat_id, user_id):
     update_user_into_database(chat_id, user_id, True)
 
 
-def ban_Spammer(chat_id, user_id):
-    pass
+#TODO: проверить, что удаляется сообщение после бана
+def ban_Spammer(context: telegram.ext.CallbackContext):
+    context.bot.send_message(chat_id=context.job.context, text='ban_Spammer')
 
 
 # Typing animation to show to user to imitate human interaction
@@ -101,45 +114,72 @@ send_typing_action = send_action(ChatAction.TYPING)
 
 @send_typing_action
 def hodor_watch_the_user(update, context):
-    logging.debug(update.message)
+    chat_id = update.message.chat_id
+    user_id = update.message.from_user.id
+    job_name = str(chat_id) + config.job_name_separator + str(user_id)
 
-    logging.debug('New user [%s][%s] has language: %s ' %
-                  (update.message.from_user.id,
+#    logger.debug(update.message)
+
+    logger.debug('New user [%s][%s] has language: %s ' %
+                 (update.message.from_user.id,
                   update.message.from_user.username,
                   update.message.from_user.language_code))
 
     save_message_text_to_database(update.message.from_user.id,
-                                update.message.from_user.username,
-                                update.message.text, update.message.caption,
-                                update.message.parse_entities(),
-                                update.message.caption_entities)
+                                  update.message.from_user.username,
+                                  update.message.text, update.message.caption,
+                                  update.message.parse_entities(),
+                                  update.message.caption_entities)
 
     for new_member in update.message.new_chat_members:
-        if is_ChineseText(new_member.username):
+        if is_chineese.is_chineese(new_member.username) or (is_chineese.is_chinese(new_member.full_name)):
             pass
 
-        add_Untrusted(update.message.chat.id, new_member.id)
+        captcha_text = tg_kb_captcha().get_today_captcha()
+
+        keyboard = [[InlineKeyboardButton(captcha_text[0],
+                                          callback_data=captcha_text[0]),
+                     InlineKeyboardButton(captcha_text[1],
+                                          callback_data=captcha_text[1]),
+                     InlineKeyboardButton(captcha_text[2],
+                                          callback_data=captcha_text[2]),
+                     InlineKeyboardButton(captcha_text[3],
+                                          callback_data=captcha_text[3])]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_markdown("@" + update.message.from_user.username +
+                     " если не спамбот, то нажми кнопку " + captcha_text[0],
+                     reply_markup=reply_markup)
+
+        add_Untrusted(chat_id, new_member.id)
+        add_user_to_waiting_dict(chat_id, new_member.id)
+
+        context.job_queue.run_once(ban_Spammer,
+                                   config.due_kb_timer, context=chat_id,
+                                   name=job_name)
 
 
 @send_typing_action
 def hodor_hold_the_URL_door(update, context):
 
     save_message_text_to_database(update.message.from_user.id,
-                                update.message.from_user.username,
-                                update.message.text, update.message.caption,
-                                update.message.parse_entities(),
-                                update.message.caption_entities)
+                                  update.message.from_user.username,
+                                  update.message.text, update.message.caption,
+                                  update.message.parse_entities(),
+                                  update.message.caption_entities)
 
-    logging.info(update.message.reply_markup)
 
-    logging.info('from [%s][%s] was URL: %s ' %
+'''
+    logger.info(update.message.reply_markup)
+
+    logger.info('from [%s][%s] was URL: %s ' %
                       (update.message.from_user.id,
                       update.message.from_user.username,
                       update.message.reply_markup))
 
     update.message.reply_text("Нельзя ссылку, дебик")
+'''
 
-
+#TODO: удалить
 @send_typing_action
 def hodor_hold_the_forward_door(update, context):
 
@@ -149,7 +189,9 @@ def hodor_hold_the_forward_door(update, context):
                                 update.message.parse_entities(),
                                 update.message.caption_entities)
 
-    logging.info(update.message.reply_markup)
+
+'''
+    logger.info(update.message.reply_markup)
 
     if is_ChineseText(update.message.text):
         add_Untrusted(update.message.chat_id, update.message.from_user.id)
@@ -158,12 +200,13 @@ def hodor_hold_the_forward_door(update, context):
                         update.message.message_id)
 
     if update.message.reply_markup is not None:
-        logging.info('from [%s][%s] was keyboard in forward: %s ' %
+        logger.info('from [%s][%s] was keyboard in forward: %s ' %
                       (update.message.from_user.id,
                       update.message.from_user.username,
                       update.message.reply_markup))
 
         update.message.reply_text("Нельзя срать ебать клавиатурой в форварде")
+'''
 
 
 def get_correct_captcha_answer(message_text):
@@ -172,6 +215,9 @@ def get_correct_captcha_answer(message_text):
 
 def button(update, context):
     query = update.callback_query
+    chat_id = query.message.chat_id
+    from_user_id = query.from_user.id
+    job_name = str(chat_id) + config.job_name_separator + str(from_user_id)
 
     # check if answer from potential spammer
 
@@ -181,71 +227,82 @@ def button(update, context):
 #        edited_text += " and " + str(correct_answer == query.data)
 #        query.edit_message_text(text=edited_text)
         if (correct_answer == query.data):
-            set_Trusted(query.message.chat_id, query.message.from_user.id)
+            set_Trusted(chat_id, from_user_id)
+            context.bot.send_message(chat_id, text='good guy')
+            #TODO: снять блокировку пользователя 
+            logger.debug('set_Trusted(%s, %s)' % (chat_id, from_user_id))
+            for j in context.job_queue.jobs():
+                if job_name in j.name:
+                    j.schedule_removal()
         else:
-            add_Untrusted(update.effective_message.chat_id, query.message.from_user.id)
-            ban_Spammer(update.effective_message.chat_id, query.message.from_user.id)
-        context.bot.delete_message(update.effective_message.chat_id,
-                        query.message.message_id)
+            add_Untrusted(chat_id, from_user_id)
+            logger.debug('add_Untrusted(%s, %s)' % (chat_id, from_user_id))
+
+            # TODO: проверить, что удалится спам-сообщение
+            context.bot.send_message(chat_id, text='ban spammer!')
+            logger.info("job_name is %s" % job_name)
+            logger.info("jobs is %s" % context.job_queue.jobs())
+            for j in context.job_queue.jobs():
+                if j.name == job_name:
+                    j.schedule_removal()
+            logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
+        context.bot.delete_message(chat_id,
+                                   query.message.message_id)
     else:
-        pass
-#        context.bot.send_message(update.effective_message.chat_id,
-#                    "Ответить должен тот, кого спрашивают")
+        context.bot.send_message(chat_id,
+                                 "Ответить должен тот, кого спрашивают")
 
 
 @send_typing_action
 def hodor_hold_the_text_door(update, context):
-
+    chat_id = update.message.chat_id
+    user_id = update.message.from_user.id
     save_message_text_to_database(update.message.from_user.id,
-                                update.message.from_user.username,
-                                update.message.text, update.message.caption,
-                                update.message.parse_entities(),
-                                update.message.caption_entities)
+                                  update.message.from_user.username,
+                                  update.message.text, update.message.caption,
+                                  update.message.parse_entities(),
+                                  update.message.caption_entities)
 
-    logging.debug(update.message.reply_markup)
+    logger.debug(update.message.reply_markup)
 
-    if is_ChineseText(update.message.text):
-        add_Untrusted(update.message.chat_id, update.message.from_user.id)
-        ban_Spammer(update.message.chat_id, update.message.from_user.id)
-        context.bot.delete_message(update.message.chat_id,
-                        update.message.message_id)
-
-    if update.message.reply_markup is not None:
-        logging.info('from [%s][%s] was keyboard in text: %s ' %
-                      (update.message.from_user.id,
-                      update.message.from_user.username,
-                      update.message.reply_markup))
-
-        update.message.reply_text("Нельзя срать ебать клавиатурой в сообщении")
+    if is_chineese.is_chineese(update.message.text):
+        context.bot.send_message(chat_id, text='ban spammer!')
+        context.bot.delete_message(chat_id,
+                                   update.message.message_id)
+        return
 
     captcha_text = tg_kb_captcha().get_today_captcha()
+    job_name = str(chat_id) + config.job_name_separator + str(user_id)
 
     keyboard = [[InlineKeyboardButton(captcha_text[0],
-                    callback_data=captcha_text[0]),
+                                      callback_data=captcha_text[0]),
                  InlineKeyboardButton(captcha_text[1],
-                    callback_data=captcha_text[1]),
+                                      callback_data=captcha_text[1]),
                  InlineKeyboardButton(captcha_text[2],
-                    callback_data=captcha_text[2]),
+                                      callback_data=captcha_text[2]),
                  InlineKeyboardButton(captcha_text[3],
-                    callback_data=captcha_text[3])]]
+                                      callback_data=captcha_text[3])]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_markdown("@" + update.message.from_user.username +
                  " если не спамбот, то нажми кнопку " + captcha_text[0],
                  reply_markup=reply_markup)
 
+#TODO: временно заблокировать юзера на писание, пока не ответит на клавиатуру
+    context.job_queue.run_once(ban_Spammer,
+                               config.due_kb_timer, context=chat_id,
+                               name=job_name)
+    logger.info("context.job is")
+    logger.info(context.job)
+
+
 def error(update, context):
     """Log Errors caused by Updates."""
-    logging.warning('Update "%s" caused error "%s"', update, context.error)
+    logger.error('Update "%s" caused error "%s"', update, context.error)
 
 
 def main():
     bot = telegram.Bot(token=config.token)
 
-    # Logging module for debugging
-    logging.basicConfig(
-                handlers=[RotatingFileHandler('ignat_bot.log', maxBytes=500000, backupCount=10)],
-                format='%(asctime)s - %(levelname)s - %(lineno)d - %(message)s',
-                level=logging.DEBUG)
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
@@ -253,30 +310,31 @@ def main():
 
     user_dict = load_database_into_memory()
 
-    logging.info("Authorized on account %s" % bot.username)
+    logger.info("Authorized on account %s" % bot.username)
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members,
-                                    hodor_watch_the_user))
+    dispatcher.add_handler(MessageHandler
+                           (Filters.status_update.new_chat_members,
+                            hodor_watch_the_user))
 
-    dispatcher.add_handler(MessageHandler(Filters.text &
-                                    (Filters.entity(MessageEntity.URL) |
-                                    Filters.entity(MessageEntity.TEXT_LINK)),
-                                    hodor_hold_the_URL_door))
+#TODO: слить с форвардом ниже
+    dispatcher.add_handler(MessageHandler
+                           (Filters.text & (Filters.entity(MessageEntity.URL) |
+                                            Filters.entity(
+                                            MessageEntity.TEXT_LINK)),
+                            hodor_hold_the_URL_door))
 
-    dispatcher.add_handler(MessageHandler(Filters.forwarded,
-                                    hodor_hold_the_forward_door))
+#    dispatcher.add_handler(MessageHandler(Filters.forwarded,
+#                                          hodor_hold_the_forward_door))
 
-    dispatcher.add_handler(MessageHandler(Filters.text,
-                                    hodor_hold_the_text_door))
+    dispatcher.add_handler(MessageHandler(Filters.text | Filters.forwarded,
+                                          hodor_hold_the_text_door))
 
     dispatcher.add_handler(CallbackQueryHandler(button))
 
-    # on noncommand i.e message - echo the message on Telegram
-
     # log all errors
-    dispatcher.add_error_handler(error)
+    #dispatcher.add_error_handler(error)
 
     # Start the Bot
     updater.start_polling()

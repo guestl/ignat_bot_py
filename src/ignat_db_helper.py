@@ -5,8 +5,12 @@ import sqlite3
 
 import config
 
-import logging  
+import logging
 import os
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(config.LOGGER_LEVEL)
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -22,12 +26,12 @@ class ignat_db_helper:
 
     def __init__(self, dbname=config.dbname):
         self.dbname = dbname
-        logging.debug(dbname)
+        logger.debug(dbname)
         try:
             self.connection = sqlite3.connect(dbname)
             self.cursor = self.connection.cursor()
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
             raise e
 
     # I got this piece of code from
@@ -48,8 +52,8 @@ class ignat_db_helper:
             sql_text = "select chat_id, user_id, is_trusted from ignated_chat_users"
             self.cursor.execute(sql_text)
         except Exception as e:
-            logging.error(e)
-            logging.error(self.check_sql_string(sql_text))
+            logger.error(e)
+            logger.error(self.check_sql_string(sql_text))
 
         if self.cursor:
             for row in self.cursor:
@@ -65,8 +69,8 @@ class ignat_db_helper:
             sql_text = 'select rs.DOMAIN from rates_sources rs where rs.ID = ? group by rs.DOMAIN'
             self.cursor.execute(sql_text, (src_id,))
         except Exception as e:
-            logging.error(e)
-            logging.error(self.check_sql_string(sql_text, (src_id, )))
+            logger.error(e)
+            logger.error(self.check_sql_string(sql_text, (src_id, )))
 
         if self.cursor:
             for row in self.cursor:
@@ -76,8 +80,8 @@ class ignat_db_helper:
 
     # TODO: проверить, если на входе один список, а не список списков
     def add_currency_rates_data(self, parsed_data):
-        logging.debug("add_currency_rates_data -> parsed data is ")
-        logging.debug(parsed_data)
+        logger.debug("add_currency_rates_data -> parsed data is ")
+        logger.debug(parsed_data)
 
         try:
             sql_text = "REPLACE INTO rates (SRC_ID, BUY_VALUE, SELL_VALUE, AVRG_VALUE, " \
@@ -86,16 +90,16 @@ class ignat_db_helper:
 
             self.connection.commit()
         except Exception as e:
-            logging.error(e)
-            logging.error(sql_text)
-            logging.error(parsed_data)
+            logger.error(e)
+            logger.error(sql_text)
+            logger.error(parsed_data)
 
-        logging.debug("Commit done")
+        logger.debug("Commit done")
 
     def update_loader_log(self, src_id):
 
-        logging.debug("add_loader log data for source ")
-        logging.debug(src_id)
+        logger.debug("add_loader log data for source ")
+        logger.debug(src_id)
 
         try:
             sql_text = "INSERT INTO log_load (SRC_ID) VALUES (?)"
@@ -104,9 +108,9 @@ class ignat_db_helper:
             self.connection.commit()
         except Exception as e:
             raise e
-            logging.error(self.check_sql_string(sql_text, (src_id, )))
+            logger.error(self.check_sql_string(sql_text, (src_id, )))
 
-        logging.debug("Commit done")
+        logger.debug("Commit done")
 
     def add_cache(self, data_for_cache):
         try:
@@ -115,8 +119,8 @@ class ignat_db_helper:
 
             self.connection.commit()
         except Exception as e:
-            logging.error(e)
-            logging.error(sql_text)
-            logging.error(data_for_cache)
+            logger.error(e)
+            logger.error(sql_text)
+            logger.error(data_for_cache)
 
-        logging.debug("Commit done")
+        logger.debug("Commit done")
