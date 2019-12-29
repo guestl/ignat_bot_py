@@ -8,6 +8,18 @@ import config
 import logging
 import os
 
+'''
+addUntrustedQuery := "insert into ignated_chat_users (chat_id, user_id, is_trusted) values ($1, $2, 1)"
+
+addTrustedQuery := "insert into ignated_chat_users (chat_id, user_id) values ($1, $2)"
+
+updateTrustedQuery := "update ignated_chat_users set is_trusted = true where chat_id = $1 and user_id = $2" 
+
++ getUsersQuery := "select chat_id, user_id, is_trusted from ignated_chat_users"
+
+не надо удалять. надо апдейтнуть, как спамера и проверять на наличие в бд
+deleteSpammerQuery := "delete from ignated_chat_users where chat_id = $1 and user_id = $2"
+'''
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.LOGGER_LEVEL)
@@ -49,7 +61,8 @@ class ignat_db_helper:
         result = {}
 
         try:
-            sql_text = "select chat_id, user_id, is_trusted from ignated_chat_users"
+            sql_text = "select chat_id, user_id, is_trusted\
+                        from ignated_chat_users"
             self.cursor.execute(sql_text)
         except Exception as e:
             logger.error(e)

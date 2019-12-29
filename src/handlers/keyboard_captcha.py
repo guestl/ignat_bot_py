@@ -1,5 +1,6 @@
 from emoji import emojize
 from random import shuffle
+from config import kb_amount_of_keys
 
 
 class tg_kb_captcha():
@@ -32,4 +33,4 @@ class tg_kb_captcha():
 
     def get_today_captcha(self):
         shuffle(self.captcha)
-        return self.captcha[-4:]
+        return self.captcha[-kb_amount_of_keys:]

@@ -34,12 +34,12 @@ logger.setLevel(config.LOGGER_LEVEL)
 def load_database_into_memory():
     user_dict = database.get_user_dict()
 
-    logger.debug('доверенный ли юзер 66294146 в чате -1001478270653 - %s'
+    logger.info('доверенный ли юзер 66294146 в чате -1001478270653 - %s'
         % user_dict[-1001478270653][66294146])
-    logger.debug('всего в бд %s чата' % len(user_dict))
+    logger.info('всего в бд %s чата' % len(user_dict))
 
     for key in user_dict.keys():
-        logger.debug('в чате %s всего %s пользователей'
+        logger.info('в чате %s всего %s пользователей'
             % (key, len(user_dict[key])))
 
     return user_dict
@@ -89,9 +89,15 @@ def set_Trusted(chat_id, user_id):
     update_user_into_database(chat_id, user_id, True)
 
 
-#TODO: проверить, что удаляется сообщение после бана
+# TODO: проверить, что удаляется сообщение после бана
 def ban_Spammer(context: telegram.ext.CallbackContext):
-    context.bot.send_message(chat_id=context.job.context, text='ban_Spammer')
+    chat_id = context.job.context['chat_id']
+    user_id = context.job.context['user_id']
+    message_id = context.job.context['message_id']
+    reply_message_id = context.job.context['reply_message_id']
+    context.bot.deleteMessage(chat_id, message_id)
+    context.bot.deleteMessage(chat_id, reply_message_id)
+    context.bot.send_message(chat_id, text='ban_Spammer %s in %s' % (user_id, chat_id))
 
 
 # Typing animation to show to user to imitate human interaction
@@ -154,7 +160,9 @@ def hodor_watch_the_user(update, context):
         add_user_to_waiting_dict(chat_id, new_member.id)
 
         context.job_queue.run_once(ban_Spammer,
-                                   config.due_kb_timer, context=chat_id,
+                                   config.due_kb_timer,
+                                   context={'chat_id': chat_id,
+                                            'user_id': user_id},
                                    name=job_name)
 
 
@@ -179,7 +187,8 @@ def hodor_hold_the_URL_door(update, context):
     update.message.reply_text("Нельзя ссылку, дебик")
 '''
 
-#TODO: удалить
+
+# TODO: удалить
 @send_typing_action
 def hodor_hold_the_forward_door(update, context):
 
@@ -209,8 +218,12 @@ def hodor_hold_the_forward_door(update, context):
 '''
 
 
-def get_correct_captcha_answer(message_text):
-    return message_text.split(" ")[-1]
+def get_correct_captcha_answer(message_text, from_user_id):
+    correct_answer_idx = from_user_id % config.kb_amount_of_keys
+    logger.info(correct_answer_idx)
+    logger.info(message_text)
+    logger.info(from_user_id)
+    return message_text.split(" ")[correct_answer_idx]
 
 
 def button(update, context):
@@ -222,18 +235,21 @@ def button(update, context):
     # check if answer from potential spammer
 
     if (query.from_user.id == query.message.reply_to_message.from_user.id):
-        correct_answer = get_correct_captcha_answer(query.message.text)
+        correct_answer = query.message.text.split(" ")[-1]
+        logger.info(query.message.text)
+        logger.info(correct_answer)
+        logger.info(query.data)
 #        edited_text = "Selected option: {}".format(query.data)
 #        edited_text += " and " + str(correct_answer == query.data)
 #        query.edit_message_text(text=edited_text)
         if (correct_answer == query.data):
-            set_Trusted(chat_id, from_user_id)
             context.bot.send_message(chat_id, text='good guy')
-            #TODO: снять блокировку пользователя 
+            # TODO: снять блокировку пользователя
             logger.debug('set_Trusted(%s, %s)' % (chat_id, from_user_id))
             for j in context.job_queue.jobs():
                 if job_name in j.name:
                     j.schedule_removal()
+            set_Trusted(chat_id, from_user_id)
         else:
             add_Untrusted(chat_id, from_user_id)
             logger.debug('add_Untrusted(%s, %s)' % (chat_id, from_user_id))
@@ -283,16 +299,25 @@ def hodor_hold_the_text_door(update, context):
                  InlineKeyboardButton(captcha_text[3],
                                       callback_data=captcha_text[3])]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_markdown("@" + update.message.from_user.username +
-                 " если не спамбот, то нажми кнопку " + captcha_text[0],
-                 reply_markup=reply_markup)
+    reply_text = '@%s, чтобы доказать, что не бот, надо нажать кнопку %s' %\
+                 (update.message.from_user.username,
+                  get_correct_captcha_answer(' '.join(map(str, captcha_text)), user_id))
 
-#TODO: временно заблокировать юзера на писание, пока не ответит на клавиатуру
+    reply_message = update.message.reply_markdown(reply_text,
+                                                  reply_markup=reply_markup)
+
+# TODO: временно заблокировать юзера на писание, пока не ответит на клавиатуру
+# TODO: передать в job context юзернейм и чат для бана
     context.job_queue.run_once(ban_Spammer,
-                               config.due_kb_timer, context=chat_id,
+                               config.due_kb_timer,
+                               context={'chat_id': chat_id,
+                                        'user_id': user_id,
+                                        'message_id':
+                                        update.message.message_id,
+                                        'reply_message_id':
+                                        reply_message.message_id
+                                        },
                                name=job_name)
-    logger.info("context.job is")
-    logger.info(context.job)
 
 
 def error(update, context):
