@@ -16,14 +16,14 @@ from ignat_db_helper import ignat_db_helper
 from handlers.keyboard_captcha import tg_kb_captcha
 from handlers import is_chineese
 
+from datetime import datetime, timedelta
 
-global user_dict
 user_dict = {}
 waiting_dict = {}
 database = ignat_db_helper()
 
 # Logging module for debugging
-log_format = '%(asctime)s - %(levelname)s - %(lineno)d - %(message)s'
+log_format = '%(asctime)s - %(levelname)s - %(pathname)s - %(lineno)d - %(message)s'
 logging.basicConfig(handlers=[RotatingFileHandler('ignat_bot.log',
                                                   maxBytes=500000,
                                                   backupCount=10)],
@@ -47,40 +47,34 @@ def save_message_text_to_database(userID, userName, userMessageText,
                 (userID, userName, userMessageCaptionEntities))
 
 
-def add_user_into_database(chat_id, user_id):
-    logger.debug('add_user_into_database (chat_id %s, user_id %s,\
-                 )' % (chat_id, user_id))
-    return database.add_New_User(chat_id, user_id)
-
-
-def update_user_into_database(chat_id, user_id):
-    logger.debug('update_user_into_database (chat_id %s, user_id %s,\
-                 )' % (chat_id, user_id))
-    return database.set_Trusted_User(chat_id, user_id)
-
-
-def add_user_to_waiting_dict(chat_id, user_id):
-    logger.debug('add_user_to_waiting_dict (chat_id %s, user_id \
-                 %s)' % (chat_id, user_id))
+def add_user_to_waiting_dict(chat_id, user_id, correct_answer):
+    logger.info('add_user_to_waiting_dict (chat_id %s, user_id \
+                 %s, correct_answer %s)' % (chat_id, user_id, correct_answer))
 
 
 def is_Trusted(chat_id, user_id):
-    return user_dict[chat_id][user_id]
+    if chat_id in user_dict.keys():
+        if user_id in user_dict[chat_id].keys():
+            logger.info(user_dict[chat_id][user_id])
+            return user_dict[chat_id][user_id]
+    logger.info("isTrusted = None")
+    return None
 
 
 def add_Untrusted(chat_id, user_id):
     if chat_id not in user_dict.keys():
         user_dict[chat_id] = {}
-    add_user_into_database(chat_id, user_id, False)
-    return database.get_user_dict()
+    logger.info('add_New_User (chat_id %s, user_id %s,\
+                 )' % (chat_id, user_id))
+    return database.add_New_User(chat_id, user_id)
 
 
 def set_Trusted(chat_id, user_id):
-    user_dict[chat_id][user_id] = True
-    update_user_into_database(chat_id, user_id, True)
+    logger.info('database.set_Trusted_User (chat_id %s, user_id %s,)' %
+                 (chat_id, user_id))
+    return database.set_Trusted_User(chat_id, user_id)
 
 
-# TODO: проверить, что удаляется сообщение после бана
 def ban_Spammer(context: telegram.ext.CallbackContext):
     chat_id = context.job.context['chat_id']
     user_id = context.job.context['user_id']
@@ -88,7 +82,9 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
     reply_message_id = context.job.context['reply_message_id']
     context.bot.deleteMessage(chat_id, message_id)
     context.bot.deleteMessage(chat_id, reply_message_id)
-    context.bot.send_message(chat_id, text='ban_Spammer %s in %s' % (user_id, chat_id))
+    until_date = datetime.now() + timedelta(seconds=config.kick_timeout)
+    context.bot.kickChatMember(chat_id, user_id, until_date=until_date)
+    logger.info('%s removed due timeout' % (user_id))
 
 
 # Typing animation to show to user to imitate human interaction
@@ -114,6 +110,10 @@ def hodor_watch_the_user(update, context):
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
     job_name = str(chat_id) + config.job_name_separator + str(user_id)
+    message_id = update.message.message_id
+    global user_dict
+
+    logger.info(user_dict)
 
 #    logger.debug(update.message)
 
@@ -129,187 +129,205 @@ def hodor_watch_the_user(update, context):
                                   update.message.caption_entities)
 
     for new_member in update.message.new_chat_members:
+        logging.info('check if chineese')
         if (is_chineese.is_chineese(new_member.username) or
-                is_chineese.is_chinese(new_member.full_name)):
-            pass
+                is_chineese.is_chineese(new_member.full_name)):
+            until = datetime.now() + timedelta(seconds=config.kick_timeout)
+            context.bot.kickChatMember(chat_id, user_id, until_date=until)
+            context.bot.deleteMessage(chat_id, message_id)
+            logger.info('Chinese user %s %s has been removed\
+                        ' % new_member.username + new_member.full_name)
 
-        captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
+        if chat_id not in user_dict.keys():
+            user_dict[chat_id] = {}
 
-        keyboard = [[InlineKeyboardButton(captcha_text[0],
-                                          callback_data=captcha_text[0]),
-                     InlineKeyboardButton(captcha_text[1],
-                                          callback_data=captcha_text[1]),
-                     InlineKeyboardButton(captcha_text[2],
-                                          callback_data=captcha_text[2]),
-                     InlineKeyboardButton(captcha_text[3],
-                                          callback_data=captcha_text[3])]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_markdown("@" + update.message.from_user.username +
-                     " если не спамбот, то нажми кнопку " + captcha_text[0],
-                     reply_markup=reply_markup)
+        if new_member.id not in user_dict[chat_id].keys():
+            captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
+            logging.info('captcha text is %s' % (captcha_text))
 
-        user_dict = add_Untrusted(chat_id, new_member.id)
-        add_user_to_waiting_dict(chat_id, new_member.id)
+            until = datetime.now() + timedelta(days=config.silence_timeout)
+            context.bot.restrictChatMember(chat_id, user_id,
+                                           permissions=config.READ_ONLY,
+                                           until_date=until)
 
-        context.job_queue.run_once(ban_Spammer,
-                                   config.due_kb_timer,
-                                   context={'chat_id': chat_id,
-                                            'user_id': user_id},
-                                   name=job_name)
+            keyboard = [[InlineKeyboardButton(captcha_text[0],
+                                              callback_data=captcha_text[0]),
+                         InlineKeyboardButton(captcha_text[1],
+                                              callback_data=captcha_text[1]),
+                         InlineKeyboardButton(captcha_text[2],
+                                              callback_data=captcha_text[2]),
+                         InlineKeyboardButton(captcha_text[3],
+                                              callback_data=captcha_text[3])]]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            correct_answer = get_correct_captcha_answer(captcha_text, user_id)
+            if new_member.username:
+                welcome_text = ('@%s чтобы доказать, что человек,'
+                                ' нажми кнопку %s' %
+                                (new_member.username, correct_answer))
+            elif new_member.full_name:
+                welcome_text = ('@%s чтобы доказать, что человек, нажми'
+                                ' кнопку %s' %
+                                (new_member.full_name, correct_answer))
+            else:
+                welcome_text = ('Чтобы доказать, что человек,'
+                                ' нажми кнопку %s' %
+                                (correct_answer))
+
+            logging.info('welcome text is %s' % (welcome_text))
+            reply_message = update.message.reply_text(welcome_text, reply_markup=reply_markup)
+
+            add_user_to_waiting_dict(chat_id, new_member.id, correct_answer)
+
+            # TODO: обработать ситуацию, что зашел, получил кнопки и вышел
+            # иначе будет Message to delete not found
+            context.job_queue.run_once(ban_Spammer,
+                                       config.due_kb_timer,
+                                       context={'chat_id': chat_id,
+                                                'user_id': user_id,
+                                                'message_id':
+                                                update.message.message_id,
+                                                'reply_message_id':
+                                                reply_message.message_id},
+                                       name=job_name)
 
 
-@send_typing_action
 def hodor_hold_the_URL_door(update, context):
-
+    chat_id = update.message.chat_id
+    user_id = update.message.from_user.id
+    message_id = update.message.message_id
     save_message_text_to_database(update.message.from_user.id,
                                   update.message.from_user.username,
                                   update.message.text, update.message.caption,
                                   update.message.parse_entities(),
                                   update.message.caption_entities)
 
-
-'''
-    logger.info(update.message.reply_markup)
-
-    logger.info('from [%s][%s] was URL: %s ' %
-                      (update.message.from_user.id,
-                      update.message.from_user.username,
-                      update.message.reply_markup))
-
-    update.message.reply_text("Нельзя ссылку, дебик")
-'''
+    if not is_Trusted(chat_id, user_id):
+        until = datetime.now() + timedelta(seconds=config.kick_timeout)
+        context.bot.kickChatMember(chat_id, user_id, until_date=until)
+        context.bot.deleteMessage(chat_id, message_id)
+        logger.info('Untrusted user %s has been removed'
+                    ' because of link in first message' % (user_id))
+        logging.info(user_dict)
 
 
-# TODO: удалить
-@send_typing_action
-def hodor_hold_the_forward_door(update, context):
-
-    save_message_text_to_database(update.message.from_user.id,
-                                update.message.from_user.username,
-                                update.message.text, update.message.caption,
-                                update.message.parse_entities(),
-                                update.message.caption_entities)
-
-
-'''
-    logger.info(update.message.reply_markup)
-
-    if is_ChineseText(update.message.text):
-        add_Untrusted(update.message.chat_id, update.message.from_user.id)
-        ban_Spammer(update.message.chat_id, update.message.from_user.id)
-        context.bot.delete_message(update.message.chat_id,
-                        update.message.message_id)
-
-    if update.message.reply_markup is not None:
-        logger.info('from [%s][%s] was keyboard in forward: %s ' %
-                      (update.message.from_user.id,
-                      update.message.from_user.username,
-                      update.message.reply_markup))
-
-        update.message.reply_text("Нельзя срать ебать клавиатурой в форварде")
-'''
-
-
-def get_correct_captcha_answer(message_text, from_user_id):
+def get_correct_captcha_answer(captcha, from_user_id):
     correct_answer_idx = from_user_id % config.kb_amount_of_keys
     logger.info(correct_answer_idx)
-    logger.info(message_text)
+    logger.info(captcha)
     logger.info(from_user_id)
-    return message_text.split(" ")[correct_answer_idx]
+    return captcha[correct_answer_idx]
 
 
 def button(update, context):
     query = update.callback_query
     chat_id = query.message.chat_id
     from_user_id = query.from_user.id
+    message_id = query.message.message_id
     job_name = str(chat_id) + config.job_name_separator + str(from_user_id)
+    global user_dict
 
     # check if answer from potential spammer
 
     if (query.from_user.id == query.message.reply_to_message.from_user.id):
         correct_answer = query.message.text.split(" ")[-1]
-        logger.info(query.message.text)
-        logger.info(correct_answer)
-        logger.info(query.data)
-#        edited_text = "Selected option: {}".format(query.data)
-#        edited_text += " and " + str(correct_answer == query.data)
-#        query.edit_message_text(text=edited_text)
+        # logger.info(query.message.text)
+        # logger.info(correct_answer)
+        # logger.info(query.data)
+
         if (correct_answer == query.data):
-            context.bot.send_message(chat_id, text='good guy')
-            # TODO: снять блокировку пользователя
+            logger.info('Correct answer from %s in %s' %
+                        (chat_id, from_user_id))
             logger.debug('set_Trusted(%s, %s)' % (chat_id, from_user_id))
             for j in context.job_queue.jobs():
                 if job_name in j.name:
                     j.schedule_removal()
-            set_Trusted(chat_id, from_user_id)
-        else:
-            user_dict = add_Untrusted(chat_id, from_user_id)
-            logger.debug('add_Untrusted(%s, %s)' % (chat_id, from_user_id))
+            if set_Trusted(chat_id, from_user_id):
+                user_dict = database.get_user_dict()
+            logging.info(user_dict)
 
-            # TODO: проверить, что удалится спам-сообщение
-            context.bot.send_message(chat_id, text='ban spammer!')
+            until = datetime.now()  # + timedelta(days=config.silence_timeout)
+            context.bot.restrictChatMember(chat_id, from_user_id,
+                                           permissions=config.UNBANNED,
+                                           until_date=until)
+            logging.info('Adding %s as trusted' % (from_user_id))
+            if add_Untrusted(chat_id, from_user_id):
+                logging.info('Added %s as untrusted' % (from_user_id))
+
+            if set_Trusted(chat_id, from_user_id):
+                logging.info('Setted %s as trusted' % (from_user_id))
+
+            user_dict = database.get_user_dict()
+
+            logging.info(user_dict)
+        else:
+            # no correct answer given
+            # user_dict = add_Untrusted(chat_id, from_user_id)
+            # logging.info(user_dict)
+
+            logger.info('No correct answer from %s in %s' %
+                        (chat_id, from_user_id))
+
             logger.info("job_name is %s" % job_name)
             logger.info("jobs is %s" % context.job_queue.jobs())
             for j in context.job_queue.jobs():
                 if j.name == job_name:
                     j.schedule_removal()
             logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
-        context.bot.delete_message(chat_id,
-                                   query.message.message_id)
+            until = datetime.now() + timedelta(seconds=config.kick_timeout)
+            context.bot.kickChatMember(chat_id, from_user_id, until_date=until)
+            logger.info('Untrusted user %s has been removed'
+                        ' because of incorrect answer' % (from_user_id))
+
+        context.bot.delete_message(chat_id, message_id)
     else:
-        context.bot.send_message(chat_id,
-                                 "Ответить должен тот, кого спрашивают")
+        pass
+#        context.bot.send_message(chat_id,
+#                                 "Ответить должен тот, кого спрашивают")
 
 
-@send_typing_action
 def hodor_hold_the_text_door(update, context):
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
+    message_id = update.message.message_id
+    global user_dict
     save_message_text_to_database(update.message.from_user.id,
                                   update.message.from_user.username,
                                   update.message.text, update.message.caption,
                                   update.message.parse_entities(),
                                   update.message.caption_entities)
 
-    logger.debug(update.message.reply_markup)
-
-    if is_chineese.is_chineese(update.message.text):
-        context.bot.send_message(chat_id, text='ban spammer!')
-        context.bot.delete_message(chat_id,
-                                   update.message.message_id)
+    if ((is_chineese.is_chineese(update.message.text) or
+         is_chineese.is_chineese(update.message.caption)) and
+            is_Trusted(chat_id, user_id) is not True):
+        context.bot.delete_message(chat_id, message_id)
+        until = datetime.now() + timedelta(seconds=config.kick_timeout)
+        context.bot.kickChatMember(chat_id, user_id, until_date=until)
+        context.bot.deleteMessage(chat_id, message_id)
+        logger.info('Untrusted user %s has been removed'
+                    ' because of link in first message' % (user_id))
         return
 
-    captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
-    job_name = str(chat_id) + config.job_name_separator + str(user_id)
+    if update.message.reply_markup is not None:
+        logger.info('from [%s][%s] was keyboard in forward: %s ' %
+                    (update.message.from_user.id,
+                     update.message.from_user.username,
+                     update.message.reply_markup))
+        context.bot.delete_message(chat_id, message_id)
+        until = datetime.now() + timedelta(seconds=config.kick_timeout)
+        context.bot.kickChatMember(chat_id, user_id, until_date=until)
+        context.bot.deleteMessage(chat_id, message_id)
+        logger.info('Untrusted user %s has been removed'
+                    ' because of keyboard in first message' % (user_id))
 
-    keyboard = [[InlineKeyboardButton(captcha_text[0],
-                                      callback_data=captcha_text[0]),
-                 InlineKeyboardButton(captcha_text[1],
-                                      callback_data=captcha_text[1]),
-                 InlineKeyboardButton(captcha_text[2],
-                                      callback_data=captcha_text[2]),
-                 InlineKeyboardButton(captcha_text[3],
-                                      callback_data=captcha_text[3])]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    reply_text = '@%s, чтобы доказать, что не бот, надо нажать кнопку %s' %\
-                 (update.message.from_user.username,
-                  get_correct_captcha_answer(' '.join(map(str, captcha_text)), user_id))
-
-    reply_message = update.message.reply_markdown(reply_text,
-                                                  reply_markup=reply_markup)
-
-# TODO: временно заблокировать юзера на писание, пока не ответит на клавиатуру
-# TODO: передать в job context юзернейм и чат для бана
-    context.job_queue.run_once(ban_Spammer,
-                               config.due_kb_timer,
-                               context={'chat_id': chat_id,
-                                        'user_id': user_id,
-                                        'message_id':
-                                        update.message.message_id,
-                                        'reply_message_id':
-                                        reply_message.message_id
-                                        },
-                               name=job_name)
+    if is_Trusted(chat_id, user_id) is False:
+        if set_Trusted(chat_id, user_id):
+            user_dict = database.get_user_dict()
+    elif is_Trusted(chat_id, user_id) is None:
+        if add_Untrusted(chat_id, user_id):
+            if set_Trusted(chat_id, user_id):
+                user_dict = database.get_user_dict()
+    logging.info(user_dict)
 
 
 def error(update, context):
@@ -318,6 +336,7 @@ def error(update, context):
 
 
 def main():
+    global user_dict
     bot = telegram.Bot(token=config.token)
 
     # Create the Updater and pass it your bot's token.
@@ -326,8 +345,10 @@ def main():
     updater = Updater(token=config.token, use_context=True)
 
     user_dict = database.get_user_dict()
+    logging.info(user_dict)
 
-    logger.info("Authorized on account %s" % bot.username)
+    logger.info("Authorized on account %s. "
+                "version is %s" % (bot.username, config.version))
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -335,15 +356,11 @@ def main():
                            (Filters.status_update.new_chat_members,
                             hodor_watch_the_user))
 
-#TODO: слить с форвардом ниже
     dispatcher.add_handler(MessageHandler
                            (Filters.text & (Filters.entity(MessageEntity.URL) |
                                             Filters.entity(
                                             MessageEntity.TEXT_LINK)),
                             hodor_hold_the_URL_door))
-
-#    dispatcher.add_handler(MessageHandler(Filters.forwarded,
-#                                          hodor_hold_the_forward_door))
 
     dispatcher.add_handler(MessageHandler(Filters.text | Filters.forwarded,
                                           hodor_hold_the_text_door))
@@ -351,7 +368,7 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(button))
 
     # log all errors
-    #dispatcher.add_error_handler(error)
+    # dispatcher.add_error_handler(error)
 
     # Start the Bot
     updater.start_polling()

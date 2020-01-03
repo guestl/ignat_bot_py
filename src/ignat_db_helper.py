@@ -40,7 +40,7 @@ class ignat_db_helper:
         self.dbname = dbname
         logger.debug(dbname)
         try:
-            self.connection = sqlite3.connect(dbname)
+            self.connection = sqlite3.connect(dbname, check_same_thread=False)
             self.cursor = self.connection.cursor()
         except Exception as e:
             logger.error(e)
@@ -90,9 +90,9 @@ class ignat_db_helper:
         return self.cursor.rowcount
 
     def set_Trusted_User(self, chat_id, user_id):
-        set_Trusted_User_Query = "update ignated_chat_users\
-                              set is_trusted = 1\
-                              where chat_id = ? and user_id = ?"
+        set_Trusted_User_Query = ("update ignated_chat_users"
+                                  " set is_trusted = 1"
+                                  " where chat_id = ? and user_id = ?")
 
         try:
             self.cursor.execute(set_Trusted_User_Query, (chat_id, user_id, ))
