@@ -26,6 +26,7 @@ class Test_Bot:
 
     def test_chineese(self):
         s_china_char_string = '菠菜QP推广霸屏强推APP内置'
+        s_arabic_char_string = 'ارسی بلدی'
         s_no_china_string = 'no_china'
         s_none = None
         s_list = []
@@ -34,6 +35,7 @@ class Test_Bot:
         eq_(is_chineese.is_chineese(s_china_char_string), True)
         eq_(is_chineese.is_chineese(s_none), False)
         eq_(is_chineese.is_chineese(s_list), False)
+        eq_(is_chineese.is_chineese(s_arabic_char_string), False)
 
     def test_captcha_len(self):
         assert len(tg_kb_captcha().get_today_captcha(7)) == 7

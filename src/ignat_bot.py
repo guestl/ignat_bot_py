@@ -71,7 +71,7 @@ def add_Untrusted(chat_id, user_id):
 
 def set_Trusted(chat_id, user_id):
     logger.info('database.set_Trusted_User (chat_id %s, user_id %s,)' %
-                 (chat_id, user_id))
+                (chat_id, user_id))
     return database.set_Trusted_User(chat_id, user_id)
 
 
@@ -163,16 +163,18 @@ def hodor_watch_the_user(update, context):
             correct_answer = get_correct_captcha_answer(captcha_text, user_id)
             if new_member.username:
                 welcome_text = ('@%s чтобы доказать, что человек,'
-                                ' нажми кнопку %s' %
-                                (new_member.username, correct_answer))
+                                ' нажми за %s сек. кнопку %s' %
+                                (new_member.username, config.due_kb_timer,
+                                    correct_answer))
             elif new_member.full_name:
                 welcome_text = ('@%s чтобы доказать, что человек, нажми'
-                                ' кнопку %s' %
-                                (new_member.full_name, correct_answer))
+                                ' за %s сек. кнопку %s' %
+                                (new_member.full_name, config.due_kb_timer,
+                                    correct_answer))
             else:
                 welcome_text = ('Чтобы доказать, что человек,'
-                                ' нажми кнопку %s' %
-                                (correct_answer))
+                                ' нажми за %s сек. кнопку %s' %
+                                (config.due_kb_timer, correct_answer))
 
             logging.info('welcome text is %s' % (welcome_text))
             reply_message = update.message.reply_text(welcome_text, reply_markup=reply_markup)
