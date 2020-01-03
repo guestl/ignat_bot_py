@@ -16,33 +16,22 @@ from ignat_db_helper import ignat_db_helper
 from handlers.keyboard_captcha import tg_kb_captcha
 from handlers import is_chineese
 
+
+global user_dict
 user_dict = {}
 waiting_dict = {}
 database = ignat_db_helper()
 
 # Logging module for debugging
-logging.basicConfig(
-                    handlers=[RotatingFileHandler('ignat_bot.log', maxBytes=500000,
-                backupCount=10)],
-            format='%(asctime)s - %(levelname)s - %(lineno)d - %(message)s',
-            level=config.LOGGER_LEVEL)
+log_format = '%(asctime)s - %(levelname)s - %(lineno)d - %(message)s'
+logging.basicConfig(handlers=[RotatingFileHandler('ignat_bot.log',
+                                                  maxBytes=500000,
+                                                  backupCount=10)],
+                    format=log_format,
+                    level=config.LOGGER_LEVEL)
 
 logger = logging.getLogger(__name__)  # this gets the root logger
 logger.setLevel(config.LOGGER_LEVEL)
-
-
-def load_database_into_memory():
-    user_dict = database.get_user_dict()
-
-    logger.info('доверенный ли юзер 66294146 в чате -1001478270653 - %s'
-        % user_dict[-1001478270653][66294146])
-    logger.info('всего в бд %s чата' % len(user_dict))
-
-    for key in user_dict.keys():
-        logger.info('в чате %s всего %s пользователей'
-            % (key, len(user_dict[key])))
-
-    return user_dict
 
 
 def save_message_text_to_database(userID, userName, userMessageText,
@@ -58,14 +47,16 @@ def save_message_text_to_database(userID, userName, userMessageText,
                 (userID, userName, userMessageCaptionEntities))
 
 
-def add_user_into_database(chat_id, user_id, is_trusted):
+def add_user_into_database(chat_id, user_id):
     logger.debug('add_user_into_database (chat_id %s, user_id %s,\
-                 is_trusted %s)' % (chat_id, user_id, is_trusted))
+                 )' % (chat_id, user_id))
+    return database.add_New_User(chat_id, user_id)
 
 
-def update_user_into_database(chat_id, user_id, is_trusted):
+def update_user_into_database(chat_id, user_id):
     logger.debug('update_user_into_database (chat_id %s, user_id %s,\
-                 is_trusted %s)' % (chat_id, user_id, is_trusted))
+                 )' % (chat_id, user_id))
+    return database.set_Trusted_User(chat_id, user_id)
 
 
 def add_user_to_waiting_dict(chat_id, user_id):
@@ -80,8 +71,8 @@ def is_Trusted(chat_id, user_id):
 def add_Untrusted(chat_id, user_id):
     if chat_id not in user_dict.keys():
         user_dict[chat_id] = {}
-    user_dict[chat_id][user_id] = False
     add_user_into_database(chat_id, user_id, False)
+    return database.get_user_dict()
 
 
 def set_Trusted(chat_id, user_id):
@@ -138,10 +129,11 @@ def hodor_watch_the_user(update, context):
                                   update.message.caption_entities)
 
     for new_member in update.message.new_chat_members:
-        if is_chineese.is_chineese(new_member.username) or (is_chineese.is_chinese(new_member.full_name)):
+        if (is_chineese.is_chineese(new_member.username) or
+                is_chineese.is_chinese(new_member.full_name)):
             pass
 
-        captcha_text = tg_kb_captcha().get_today_captcha()
+        captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
 
         keyboard = [[InlineKeyboardButton(captcha_text[0],
                                           callback_data=captcha_text[0]),
@@ -156,7 +148,7 @@ def hodor_watch_the_user(update, context):
                      " если не спамбот, то нажми кнопку " + captcha_text[0],
                      reply_markup=reply_markup)
 
-        add_Untrusted(chat_id, new_member.id)
+        user_dict = add_Untrusted(chat_id, new_member.id)
         add_user_to_waiting_dict(chat_id, new_member.id)
 
         context.job_queue.run_once(ban_Spammer,
@@ -251,7 +243,7 @@ def button(update, context):
                     j.schedule_removal()
             set_Trusted(chat_id, from_user_id)
         else:
-            add_Untrusted(chat_id, from_user_id)
+            user_dict = add_Untrusted(chat_id, from_user_id)
             logger.debug('add_Untrusted(%s, %s)' % (chat_id, from_user_id))
 
             # TODO: проверить, что удалится спам-сообщение
@@ -287,7 +279,7 @@ def hodor_hold_the_text_door(update, context):
                                    update.message.message_id)
         return
 
-    captcha_text = tg_kb_captcha().get_today_captcha()
+    captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
     job_name = str(chat_id) + config.job_name_separator + str(user_id)
 
     keyboard = [[InlineKeyboardButton(captcha_text[0],
@@ -333,7 +325,7 @@ def main():
     # Post version 12 this will no longer be necessary
     updater = Updater(token=config.token, use_context=True)
 
-    user_dict = load_database_into_memory()
+    user_dict = database.get_user_dict()
 
     logger.info("Authorized on account %s" % bot.username)
 

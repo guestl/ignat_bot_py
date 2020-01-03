@@ -1,9 +1,9 @@
 from emoji import emojize
 from random import shuffle
-from config import kb_amount_of_keys
 
 
 class tg_kb_captcha():
+    default_len = 4
     captcha = [emojize(":eggplant:", use_aliases=True),
                emojize(":potato:", use_aliases=True),
                emojize(":carrot:", use_aliases=True),
@@ -31,6 +31,8 @@ class tg_kb_captcha():
                emojize(":no_entry:", use_aliases=True),
                emojize(":radioactive:", use_aliases=True)]
 
-    def get_today_captcha(self):
+    def get_today_captcha(self, captcha_len):
+        if type(captcha_len) is not int or captcha_len < 1:
+            captcha_len = self.default_len
         shuffle(self.captcha)
-        return self.captcha[-kb_amount_of_keys:]
+        return self.captcha[-captcha_len:]

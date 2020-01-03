@@ -27,7 +27,7 @@ logger.setLevel(config.LOGGER_LEVEL)
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
+#TODO: сделать коммиты при записи в бд и периодическое переоткрытие базы, чтобы легче было подменять ее
 class ignat_db_helper:
     """class helper for work with SQLite3 database
 
@@ -75,65 +75,31 @@ class ignat_db_helper:
                 result[row[0]][row[1]] = bool(row[2])
         return result
 
-    def get_domain(self, src_id):
-        domain = None
+    def add_New_User(self, chat_id, user_id):
+        add_New_User_Query = "insert into ignated_chat_users\
+                              (chat_id, user_id, is_trusted) values (?, ?, 0)"
 
         try:
-            sql_text = 'select rs.DOMAIN from rates_sources rs where rs.ID = ? group by rs.DOMAIN'
-            self.cursor.execute(sql_text, (src_id,))
-        except Exception as e:
-            logger.error(e)
-            logger.error(self.check_sql_string(sql_text, (src_id, )))
-
-        if self.cursor:
-            for row in self.cursor:
-                domain = row[0]
-
-        return domain
-
-    # TODO: проверить, если на входе один список, а не список списков
-    def add_currency_rates_data(self, parsed_data):
-        logger.debug("add_currency_rates_data -> parsed data is ")
-        logger.debug(parsed_data)
-
-        try:
-            sql_text = "REPLACE INTO rates (SRC_ID, BUY_VALUE, SELL_VALUE, AVRG_VALUE, " \
-                       "RATE_DATETIME, CUR_ID_FROM, CUR_ID_TO, QUANT) VALUES (?,?,?,?,?,?,?,?)"
-            self.connection.executemany(sql_text, parsed_data)
-
+            self.cursor.execute(add_New_User_Query, (chat_id, user_id, ))
             self.connection.commit()
         except Exception as e:
             logger.error(e)
-            logger.error(sql_text)
-            logger.error(parsed_data)
+            logger.error(self.check_sql_string(add_New_User_Query,
+                                               (chat_id, user_id, )))
 
-        logger.debug("Commit done")
+        return self.cursor.rowcount
 
-    def update_loader_log(self, src_id):
-
-        logger.debug("add_loader log data for source ")
-        logger.debug(src_id)
+    def set_Trusted_User(self, chat_id, user_id):
+        set_Trusted_User_Query = "update ignated_chat_users\
+                              set is_trusted = 1\
+                              where chat_id = ? and user_id = ?"
 
         try:
-            sql_text = "INSERT INTO log_load (SRC_ID) VALUES (?)"
-            self.connection.execute(sql_text, (src_id,))
-
-            self.connection.commit()
-        except Exception as e:
-            raise e
-            logger.error(self.check_sql_string(sql_text, (src_id, )))
-
-        logger.debug("Commit done")
-
-    def add_cache(self, data_for_cache):
-        try:
-            sql_text = "REPLACE INTO cache_rates (SRC_ID, REQUESTED_RATE_DATE, CACHE_DATA) VALUES (?,?,?)"
-            self.connection.executemany(sql_text, (data_for_cache,))
-
+            self.cursor.execute(set_Trusted_User_Query, (chat_id, user_id, ))
             self.connection.commit()
         except Exception as e:
             logger.error(e)
-            logger.error(sql_text)
-            logger.error(data_for_cache)
+            logger.error(self.check_sql_string(set_Trusted_User_Query,
+                                               (chat_id, user_id, )))
 
-        logger.debug("Commit done")
+        return self.cursor.rowcount
