@@ -55,7 +55,7 @@ def add_user_to_waiting_dict(chat_id, user_id, correct_answer):
 def is_Trusted(chat_id, user_id):
     if chat_id in user_dict.keys():
         if user_id in user_dict[chat_id].keys():
-            logger.info(user_dict[chat_id][user_id])
+#            logger.info(user_dict[chat_id][user_id])
             return user_dict[chat_id][user_id]
     logger.info("isTrusted = None")
     return None
@@ -135,8 +135,11 @@ def hodor_watch_the_user(update, context):
             until = datetime.now() + timedelta(seconds=config.kick_timeout)
             context.bot.kickChatMember(chat_id, user_id, until_date=until)
             context.bot.deleteMessage(chat_id, message_id)
-            logger.info('Chinese user %s %s has been removed\
-                        ' % new_member.username + new_member.full_name)
+            logger.info('Chinese user has been removed')
+            logger.info('Chinese user %s username has been removed\
+                        ' % new_member.username)
+            logger.info('Chinese user %s fullname has been removed\
+                        ' % new_member.full_name)
 
         if chat_id not in user_dict.keys():
             user_dict[chat_id] = {}
