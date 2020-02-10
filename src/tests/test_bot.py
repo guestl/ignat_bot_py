@@ -30,12 +30,14 @@ class Test_Bot:
         s_no_china_string = 'no_china'
         s_none = None
         s_list = []
+        s_unicode = 'Ženja 🐲 Che'
 
         eq_(is_chineese.is_chineese(s_no_china_string), False)
         eq_(is_chineese.is_chineese(s_china_char_string), True)
         eq_(is_chineese.is_chineese(s_none), False)
         eq_(is_chineese.is_chineese(s_list), False)
         eq_(is_chineese.is_chineese(s_arabic_char_string), False)
+        eq_(is_chineese.is_chineese(s_unicode), False)
 
     def test_captcha_len(self):
         assert len(tg_kb_captcha().get_today_captcha(7)) == 7

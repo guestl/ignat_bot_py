@@ -123,3 +123,4 @@ sftp-config.json
 src/config.py
 src/fd.txt
 src/webhook curl.txt
+*.service

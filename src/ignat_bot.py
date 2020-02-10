@@ -23,7 +23,7 @@ waiting_dict = {}
 database = ignat_db_helper()
 
 # Logging module for debugging
-log_format = '%(asctime)s - %(levelname)s - %(pathname)s - %(lineno)d - %(message)s'
+log_format = '%(asctime)s %(levelname)s %(filename)-12s %(funcName)s %(lineno)d %(message)s'
 logging.basicConfig(handlers=[RotatingFileHandler('ignat_bot.log',
                                                   maxBytes=500000,
                                                   backupCount=10)],
@@ -135,11 +135,9 @@ def hodor_watch_the_user(update, context):
             until = datetime.now() + timedelta(seconds=config.kick_timeout)
             context.bot.kickChatMember(chat_id, user_id, until_date=until)
             context.bot.deleteMessage(chat_id, message_id)
-            logger.info('Chinese user has been removed')
-            logger.info('Chinese user %s username has been removed\
-                        ' % new_member.username)
-            logger.info('Chinese user %s fullname has been removed\
-                        ' % new_member.full_name)
+            logger.info('Chinese user %s with username %s fullname %s has been removed\
+                        ' % (user_id, new_member.username, new_member.full_name))
+            return
 
         if chat_id not in user_dict.keys():
             user_dict[chat_id] = {}
@@ -165,18 +163,18 @@ def hodor_watch_the_user(update, context):
             reply_markup = InlineKeyboardMarkup(keyboard)
             correct_answer = get_correct_captcha_answer(captcha_text, user_id)
             if new_member.username:
-                welcome_text = ('@%s чтобы доказать, что человек,'
-                                ' нажми за %s сек. кнопку %s' %
+                welcome_text = ('@%s чтобы доказать, что не бот,'
+                                ' нажми в течение %s сек. кнопку %s' %
                                 (new_member.username, config.due_kb_timer,
                                     correct_answer))
             elif new_member.full_name:
-                welcome_text = ('@%s чтобы доказать, что человек, нажми'
-                                ' за %s сек. кнопку %s' %
+                welcome_text = ('%s чтобы доказать, что не бот, нажми'
+                                ' в течение %s сек. кнопку %s' %
                                 (new_member.full_name, config.due_kb_timer,
                                     correct_answer))
             else:
-                welcome_text = ('Чтобы доказать, что человек,'
-                                ' нажми за %s сек. кнопку %s' %
+                welcome_text = ('Чтобы доказать, что не бот,'
+                                ' нажми в течение %s сек. кнопку %s' %
                                 (config.due_kb_timer, correct_answer))
 
             logging.info('welcome text is %s' % (welcome_text))
@@ -213,7 +211,6 @@ def hodor_hold_the_URL_door(update, context):
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
-        logging.info(user_dict)
 
 
 def get_correct_captcha_answer(captcha, from_user_id):
@@ -249,7 +246,6 @@ def button(update, context):
                     j.schedule_removal()
             if set_Trusted(chat_id, from_user_id):
                 user_dict = database.get_user_dict()
-            logging.info(user_dict)
 
             until = datetime.now()  # + timedelta(days=config.silence_timeout)
             context.bot.restrictChatMember(chat_id, from_user_id,
@@ -332,7 +328,6 @@ def hodor_hold_the_text_door(update, context):
         if add_Untrusted(chat_id, user_id):
             if set_Trusted(chat_id, user_id):
                 user_dict = database.get_user_dict()
-    logging.info(user_dict)
 
 
 def error(update, context):
