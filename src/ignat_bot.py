@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 
 user_dict = {}
 waiting_dict = {}
+
 database = ignat_db_helper()
 
 # Logging module for debugging
@@ -50,6 +51,10 @@ def save_message_text_to_database(userID, userName, userMessageText,
 def add_user_to_waiting_dict(chat_id, user_id, correct_answer):
     logger.info('add_user_to_waiting_dict (chat_id %s, user_id \
                  %s, correct_answer %s)' % (chat_id, user_id, correct_answer))
+    if chat_id not in waiting_dict.keys():
+        waiting_dict[chat_id] = {}
+    waiting_dict[chat_id][user_id] = correct_answer
+    logger.info('waiting_dict is %s' % waiting_dict)
 
 
 def is_Trusted(chat_id, user_id):
@@ -84,6 +89,13 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
     context.bot.deleteMessage(chat_id, reply_message_id)
     until_date = datetime.now() + timedelta(seconds=config.kick_timeout)
     context.bot.kickChatMember(chat_id, user_id, until_date=until_date)
+    try:
+        del waiting_dict[chat_id][user_id]
+    except Exception as e:
+        logger.info('Error while deleting %s from %s' % (chat_id, user_id))
+        logger.info(e)
+
+    logger.info('waiting_dict is %s' % waiting_dict)
     logger.info('%s removed due timeout' % (user_id))
 
 
@@ -260,6 +272,13 @@ def button(update, context):
 
             user_dict = database.get_user_dict()
 
+            try:
+                del waiting_dict[chat_id][from_user_id]
+            except Exception as e:
+                logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
+                logger.info(e)
+
+            logger.info('waiting_dict is %s' % waiting_dict)
             logging.info(user_dict)
         else:
             # no correct answer given
@@ -277,6 +296,14 @@ def button(update, context):
             logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
             until = datetime.now() + timedelta(seconds=config.kick_timeout)
             context.bot.kickChatMember(chat_id, from_user_id, until_date=until)
+
+            try:
+                del waiting_dict[chat_id][from_user_id]
+            except Exception as e:
+                logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
+                logger.info(e)
+
+            logger.info('waiting_dict is %s' % waiting_dict)
             logger.info('Untrusted user %s has been removed'
                         ' because of incorrect answer' % (from_user_id))
 
