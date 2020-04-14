@@ -18,6 +18,9 @@ from handlers import is_chineese
 
 from datetime import datetime, timedelta
 
+# from emoji import demojize
+from emoji import emojize
+
 user_dict = {}
 waiting_dict = {}
 
@@ -158,36 +161,45 @@ def hodor_watch_the_user(update, context):
             captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
             logging.info('captcha text is %s' % (captcha_text))
 
+            # TODO: Transfert emoji to keyboard_captcha class
+            captcha_emoji = []
+
+            for single_captcha in captcha_text:
+                captcha_emoji.append(emojize(single_captcha, use_aliases=True))
+
             until = datetime.now() + timedelta(days=config.silence_timeout)
             context.bot.restrictChatMember(chat_id, user_id,
                                            permissions=config.READ_ONLY,
                                            until_date=until)
 
-            keyboard = [[InlineKeyboardButton(captcha_text[0],
+            keyboard = [[InlineKeyboardButton(captcha_emoji[0],
                                               callback_data=captcha_text[0]),
-                         InlineKeyboardButton(captcha_text[1],
+                         InlineKeyboardButton(captcha_emoji[1],
                                               callback_data=captcha_text[1]),
-                         InlineKeyboardButton(captcha_text[2],
+                         InlineKeyboardButton(captcha_emoji[2],
                                               callback_data=captcha_text[2]),
-                         InlineKeyboardButton(captcha_text[3],
+                         InlineKeyboardButton(captcha_emoji[3],
                                               callback_data=captcha_text[3])]]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            correct_answer = get_correct_captcha_answer(captcha_text, user_id)
+            correct_answer = get_correct_captcha_answer_idx(captcha_text,
+                                                            user_id)
+            correct_answ_text = tg_kb_captcha().get_captcha_answer(correct_answer)
+
             if new_member.username:
                 welcome_text = ('@%s чтобы доказать, что не бот,'
-                                ' нажми в течение %s сек. кнопку %s' %
+                                ' нажми в течение %s сек. кнопку, где с изображением: %s' %
                                 (new_member.username, config.due_kb_timer,
-                                    correct_answer))
+                                    correct_answ_text))
             elif new_member.full_name:
                 welcome_text = ('%s чтобы доказать, что не бот, нажми'
-                                ' в течение %s сек. кнопку %s' %
+                                ' в течение %s сек. кнопку, где с изображением: %s' %
                                 (new_member.full_name, config.due_kb_timer,
-                                    correct_answer))
+                                    correct_answ_text))
             else:
                 welcome_text = ('Чтобы доказать, что не бот,'
-                                ' нажми в течение %s сек. кнопку %s' %
-                                (config.due_kb_timer, correct_answer))
+                                ' нажми в течение %s сек. кнопку, где с изображением: %s' %
+                                (config.due_kb_timer, correct_answ_text))
 
             logging.info('welcome text is %s' % (welcome_text))
             reply_message = update.message.reply_text(welcome_text, reply_markup=reply_markup)
@@ -225,11 +237,11 @@ def hodor_hold_the_URL_door(update, context):
                     ' because of link in first message' % (user_id))
 
 
-def get_correct_captcha_answer(captcha, from_user_id):
+def get_correct_captcha_answer_idx(captcha, from_user_id):
     correct_answer_idx = from_user_id % config.kb_amount_of_keys
-    logger.info(correct_answer_idx)
-    logger.info(captcha)
-    logger.info(from_user_id)
+    # logger.info(correct_answer_idx)
+    # logger.info(captcha)
+    # logger.info(from_user_id)
     return captcha[correct_answer_idx]
 
 
@@ -244,14 +256,15 @@ def button(update, context):
     # check if answer from potential spammer
 
     if (query.from_user.id == query.message.reply_to_message.from_user.id):
-        correct_answer = query.message.text.split(" ")[-1]
-        # logger.info(query.message.text)
-        # logger.info(correct_answer)
-        # logger.info(query.data)
+
+        correct_answer = waiting_dict[chat_id][from_user_id]
+        logger.info("Message text: %s" % query.message.text)
+        logger.info("Correct answer: %s" % correct_answer)
+        logger.info("query.data: %s" % query.data)
 
         if (correct_answer == query.data):
             logger.info('Correct answer from %s in %s' %
-                        (chat_id, from_user_id))
+                        (from_user_id, chat_id))
             logger.debug('set_Trusted(%s, %s)' % (chat_id, from_user_id))
             for j in context.job_queue.jobs():
                 if job_name in j.name:

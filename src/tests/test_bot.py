@@ -1,9 +1,11 @@
-# run me as "nosetests -v --with-coverage --cover-inclusive --cover-package="ignat_bot""
+# run me as "nosetests -v --nocapture --with-coverage --cover-inclusive --cover-package="ignat_bot""
 from nose.tools import *
 
-import os
+# import os
 # import sys
 # import io
+
+from emoji import demojize
 
 from handlers import is_chineese
 from handlers.keyboard_captcha import tg_kb_captcha
@@ -49,6 +51,12 @@ class Test_Bot:
     def test_captcha_context(self):
         captcha = tg_kb_captcha().get_today_captcha(4)
         for char in captcha:
+            assert (char in tg_kb_captcha().captcha) is True
+
+    def test_captcha_context_2(self):
+        captcha = tg_kb_captcha().get_today_captcha(4)
+        for char in captcha:
+            print(char, tg_kb_captcha().get_captcha_answer(demojize(char)))
             assert (char in tg_kb_captcha().captcha) is True
 
     def test_db_connection(self):
