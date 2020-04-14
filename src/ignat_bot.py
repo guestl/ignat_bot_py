@@ -161,7 +161,7 @@ def hodor_watch_the_user(update, context):
             captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
             logging.info('captcha text is %s' % (captcha_text))
 
-            # TODO: Transfert emoji to keyboard_captcha class
+            # TODO: Transfert emoji back to keyboard_captcha class
             captcha_emoji = []
 
             for single_captcha in captcha_text:
@@ -188,17 +188,17 @@ def hodor_watch_the_user(update, context):
 
             if new_member.username:
                 welcome_text = ('@%s чтобы доказать, что не бот,'
-                                ' нажми в течение %s сек. кнопку, где с изображением: %s' %
+                                ' нажми в течение %s сек. кнопку с изображением: %s' %
                                 (new_member.username, config.due_kb_timer,
                                     correct_answ_text))
             elif new_member.full_name:
                 welcome_text = ('%s чтобы доказать, что не бот, нажми'
-                                ' в течение %s сек. кнопку, где с изображением: %s' %
+                                ' в течение %s сек. кнопку с изображением: %s' %
                                 (new_member.full_name, config.due_kb_timer,
                                     correct_answ_text))
             else:
                 welcome_text = ('Чтобы доказать, что не бот,'
-                                ' нажми в течение %s сек. кнопку, где с изображением: %s' %
+                                ' нажми в течение %s сек. кнопку с изображением: %s' %
                                 (config.due_kb_timer, correct_answ_text))
 
             logging.info('welcome text is %s' % (welcome_text))
