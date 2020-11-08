@@ -51,13 +51,18 @@ def save_message_text_to_database(userID, userName, userMessageText,
                 (userID, userName, userMessageCaptionEntities))
 
 
-def add_user_to_waiting_dict(chat_id, user_id, correct_answer):
+def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
     logger.info('add_user_to_waiting_dict (chat_id %s, user_id \
-                 %s, correct_answer %s)' % (chat_id, user_id, correct_answer))
+                 %s, correct_answer %s), job_name %S' % (chat_id, user_id, 
+                                                         correct_answer, job_name))
     if chat_id not in waiting_dict.keys():
         waiting_dict[chat_id] = {}
     waiting_dict[chat_id][user_id] = correct_answer
     logger.info('waiting_dict is %s' % waiting_dict)
+
+
+def remove_from_waiting_list(chat_id, user_id, correct_answer, job_name):
+    del waiting_dict[chat_id][from_user_id]
 
 
 def is_Trusted(chat_id, user_id):
@@ -93,10 +98,12 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
     until_date = datetime.now() + timedelta(seconds=config.kick_timeout)
     context.bot.kickChatMember(chat_id, user_id, until_date=until_date)
     try:
-        del waiting_dict[chat_id][user_id]
+        #TODO: call here remove from waiting list
+        remove_from_waiting_list(chat_id, user_id, '', '')
     except Exception as e:
         logger.info('Error while deleting %s from %s' % (chat_id, user_id))
         logger.info(e)
+
 
     logger.info('waiting_dict is %s' % waiting_dict)
     logger.info('%s removed due timeout' % (user_id))
@@ -120,11 +127,15 @@ def send_action(action):
 send_typing_action = send_action(ChatAction.TYPING)
 
 
+def get_job_name(chat_id, user_id):
+    return str(chat_id) + config.job_name_separator + str(user_id)
+
+
 @send_typing_action
 def hodor_watch_the_user(update, context):
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
-    job_name = str(chat_id) + config.job_name_separator + str(user_id)
+    job_name = get_job_name(chat_id, user_id)
     message_id = update.message.message_id
     global user_dict
 
@@ -184,27 +195,27 @@ def hodor_watch_the_user(update, context):
             reply_markup = InlineKeyboardMarkup(keyboard)
             correct_answer = get_correct_captcha_answer_idx(captcha_text,
                                                             user_id)
-            correct_answ_text = tg_kb_captcha().get_captcha_answer(correct_answer)
+            correct_btn_description = tg_kb_captcha().get_captcha_answer(correct_answer)
 
             if new_member.username:
                 welcome_text = ('@%s чтобы доказать, что не бот,'
                                 ' нажми в течение %s сек. кнопку с изображением: %s' %
                                 (new_member.username, config.due_kb_timer,
-                                    correct_answ_text))
+                                    correct_btn_description))
             elif new_member.full_name:
                 welcome_text = ('%s чтобы доказать, что не бот, нажми'
                                 ' в течение %s сек. кнопку с изображением: %s' %
                                 (new_member.full_name, config.due_kb_timer,
-                                    correct_answ_text))
+                                    correct_btn_description))
             else:
                 welcome_text = ('Чтобы доказать, что не бот,'
                                 ' нажми в течение %s сек. кнопку с изображением: %s' %
-                                (config.due_kb_timer, correct_answ_text))
+                                (config.due_kb_timer, correct_btn_description))
 
             logging.info('welcome text is %s' % (welcome_text))
             reply_message = update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
-            add_user_to_waiting_dict(chat_id, new_member.id, correct_answer)
+            add_user_to_waiting_dict(chat_id, new_member.id, correct_answer, job_name)
 
             # TODO: обработать ситуацию, что зашел, получил кнопки и вышел
             # иначе будет Message to delete not found
@@ -286,7 +297,9 @@ def button(update, context):
             user_dict = database.get_user_dict()
 
             try:
-                del waiting_dict[chat_id][from_user_id]
+                remove_from_waiting_list(chat_id, user_id, '', '')
+                # TODO: call here remove from waiting table too
+
             except Exception as e:
                 logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
                 logger.info(e)
@@ -311,7 +324,9 @@ def button(update, context):
             context.bot.kickChatMember(chat_id, from_user_id, until_date=until)
 
             try:
-                del waiting_dict[chat_id][from_user_id]
+                remove_from_waiting_list(chat_id, user_id, '', '')
+                # TODO: call here remove from waiting table too
+
             except Exception as e:
                 logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
                 logger.info(e)
@@ -412,6 +427,9 @@ def main():
 
     # Start the Bot
     updater.start_polling()
+
+    # TODO: add here call retrive waiting list and create jobs
+
 
     # Block until the user presses Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since

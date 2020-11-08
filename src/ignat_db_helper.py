@@ -89,6 +89,23 @@ class ignat_db_helper:
 
         return self.cursor.rowcount
 
+    # TODO: add delete and retrieve method
+    # TODO: add call delete in job processing
+    # TODO: add call retrive in bot start 
+    def add_New_User_to_waitingList(self, chat_id, user_id, correct_answer, job_name):
+        add_New_User_to_waitingList = "insert into waiting_list\
+                              (chat_id, user_id, correct_answer, job_name) values (?, ?, ?, ?)"
+
+        try:
+            self.cursor.execute(add_New_User_to_waitingList, (chat_id, user_id, correct_answer, job_name, ))
+            self.connection.commit()
+        except Exception as e:
+            logger.error(e)
+            logger.error(self.check_sql_string(add_New_User_to_waitingList,
+                                               (chat_id, user_id, correct_answer, job_name, )))
+
+        return self.cursor.rowcount
+
     def set_Trusted_User(self, chat_id, user_id):
         set_Trusted_User_Query = ("update ignated_chat_users"
                                   " set is_trusted = 1"
