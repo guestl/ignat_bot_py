@@ -55,6 +55,9 @@ def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
     logger.info('add_user_to_waiting_dict (chat_id %s, user_id \
                  %s, correct_answer %s), job_name %S' % (chat_id, user_id, 
                                                          correct_answer, job_name))
+
+    database.add_New_User_to_waiting_list(chat_id, user_id, correct_answer, job_name)
+    
     if chat_id not in waiting_dict.keys():
         waiting_dict[chat_id] = {}
     waiting_dict[chat_id][user_id] = correct_answer
@@ -63,6 +66,7 @@ def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
 
 def remove_from_waiting_list(chat_id, user_id, correct_answer, job_name):
     del waiting_dict[chat_id][from_user_id]
+    database.delete_from_waiting_list(chat_id, user_id, correct_answer, job_name)
 
 
 def is_Trusted(chat_id, user_id):
