@@ -7,8 +7,10 @@
 def is_chineese(text):
     if ((text is None)) or (type(text) is not str):
             return False
-    for char in text:
-        if ord(char) in range(19968, 40959):
-            # ord('\u4e00')..ord('\u9FFF')
-            return True
     return False
+#   временная заглушка, т.к. проверка не нужна
+#    for char in text:
+#        if ord(char) in range(19968, 40959):
+#            # ord('\u4e00')..ord('\u9FFF')
+#            return True
+#    return False
