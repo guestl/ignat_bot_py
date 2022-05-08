@@ -8,6 +8,7 @@ from nose.tools import *
 from emoji import demojize
 
 from handlers import is_chineese
+from handlers.handlers import get_eng_percent
 from handlers.keyboard_captcha import tg_kb_captcha
 from ignat_db_helper import ignat_db_helper
 import sqlite3
@@ -47,6 +48,17 @@ class Test_Bot:
         assert len(tg_kb_captcha().get_today_captcha(0)) is 4
         assert len(tg_kb_captcha().get_today_captcha('a')) is 4
         assert len(tg_kb_captcha().get_today_captcha(1.3)) is 4
+
+    def test_eng_percent(self):
+        s_russian_string = 'Строка с русским текстом'
+        s_lat_string = 'String with a latin text'
+        s_40_russian_string = 'Строка with a latin chars in the string. So let try'
+        s_60_russian_string = 'Строка где много русских букв, даже больше, чем на латинском latin text'
+
+        assert get_eng_percent(s_40_russian_string) > 0.5
+        assert get_eng_percent(s_60_russian_string) < 0.5
+        assert get_eng_percent(s_lat_string) > 0.8
+        assert get_eng_percent(s_russian_string) < 0.2
 
     def test_captcha_context(self):
         captcha = tg_kb_captcha().get_today_captcha(4)

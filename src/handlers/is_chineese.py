@@ -6,7 +6,7 @@
 
 def is_chineese(text):
     if ((text is None)) or (type(text) is not str):
-            return False
+        return False
     return False
 #   временная заглушка, т.к. проверка не нужна
 #    for char in text:

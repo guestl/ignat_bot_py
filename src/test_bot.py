@@ -1,10 +1,18 @@
 # Python-telegram-bot libraries
 import telegram
-from telegram.ext import Updater, MessageHandler, Filters, CallbackQueryHandler
-from telegram.ext import CommandHandler
-from telegram import ChatAction, MessageEntity
+from telegram.ext import (
+    Updater,
+    MessageHandler,
+    Filters,
+    CallbackQueryHandler,
+    PollAnswerHandler,
+    CommandHandler,)
+from telegram import (
+    ChatAction,
+    MessageEntity,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,)
 from functools import wraps
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # Logging and requests libraries
 import logging
@@ -69,6 +77,9 @@ def get_admins_usernamelist(bot, chat_id):
 def call_admins(update, context):
     logger.info('we are in call_admins')
     result = ''
+    chat_id = update.message.chat_id
+    logger.info(chat_id)
+    logger.info(update.message.text)
 
     if update.message is None:
         return
@@ -76,30 +87,23 @@ def call_admins(update, context):
     if update.message.from_user is None:
         return
 
-    if update.message.text is None:
-        return
-
-    chat_id = update.message.chat_id
-    logger.info(chat_id)
-    logger.info(update.message.text)
-
     if update.message.from_user.id:
         user_id = update.message.from_user.id
     if update.message.from_user.first_name:
         user_names = update.message.from_user.first_name
     if update.message.from_user.last_name:
         user_names += ' ' + update.message.from_user.last_name
-                
-    username = 'person with no user name'	
-    if update.message.from_user.username:
-        username = '@' + update.message.from_user.username
+    username = '@' + update.message.from_user.username
     # message_id = update.message.message_id
 
-    logger.info("call to arms")
+    logger.info("update_by_somename")
     logger.info(user_id)
-    logger.info(user_names)
+    #logger.info(user_names)
     logger.info(username)
     # database.update_by_somename(user_id, user_names, username)
+
+    if update.message.text is None:
+        return
 
     admin_list = get_admins_usernamelist(context.bot,
                                          update.message.chat_id)
@@ -227,8 +231,7 @@ def hodor_watch_the_user(update, context):
     global user_dict
 
     #logger.info(user_dict)
-
-#    logger.debug(update.message)
+    #logger.debug(update.message)
 
     logger.debug('New user [%s][%s] has language: %s ' %
                  (update.message.from_user.id,
@@ -471,16 +474,66 @@ def button(update, context):
 #                                 "Ответить должен тот, кого спрашивают")
 
 
+def receive_poll_answer(update, context):
+    """Summarize a users poll vote"""
+    answer = update.poll_answer
+    poll_id = answer.poll_id
+    #chat_id = update.message.chat.id
+
+    logging.info(answer)
+    logging.info(update)
+    logging.info(context)
+
+    try:
+        questions = context.bot_data[poll_id]["questions"]
+    # this means this poll answer update is from an old poll, we can't do our answering then
+    except KeyError:
+        return
+
+    selected_options = answer.option_ids
+
+
+    # answer_string = ""
+    # for question_id in selected_options:
+    #     if question_id != selected_options[-1]:
+    #         answer_string += questions[question_id] + " and "
+    #     else:
+    #         answer_string += questions[question_id]
+    # context.bot.send_message(
+    #     context.bot_data[poll_id]["chat_id"],
+    #     f"{update.effective_user.mention_html()} feels {answer_string}!",
+    #     parse_mode=ParseMode.HTML,
+    # )
+    # context.bot_data[poll_id]["answers"] += 1
+    # # Close poll after three participants voted
+    # if context.bot_data[poll_id]["answers"] == 3:
+    #     context.bot.stop_poll(
+    #         context.bot_data[poll_id]["chat_id"], context.bot_data[poll_id]["message_id"]
+    #    )
+
+
 def hodor_hold_the_text_door(update, context):
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
     message_id = update.message.message_id
     global user_dict
-    save_message_text_to_database(update.message.from_user.id,
-                                  update.message.from_user.username,
-                                  update.message.text, update.message.caption,
-                                  update.message.parse_entities(),
-                                  update.message.caption_entities)
+    #save_message_text_to_database(update.message.from_user.id,
+    #                              update.message.from_user.username,
+    #                              update.message.text, update.message.caption,
+    #                              update.message.parse_entities(),
+    #                              update.message.caption_entities)
+
+    question = "2+2=?"
+    options = ["4", "2", "1", "5", "3"]
+
+    message = context.bot.send_poll(update.effective_chat.id,
+                                    question,
+                                    options,
+                                    open_period=60,
+                                    is_anonymous=False,)
+    poll_dict[chat_id] = {message.poll.id: 1}
+
+    logging.info(poll_dict)
 
     if ((is_chineese.is_chineese(update.message.text) or
          is_chineese.is_chineese(update.message.caption)) and
@@ -521,6 +574,7 @@ def error(update, context):
 
 def main():
     global user_dict
+    global poll_dict
     bot = telegram.Bot(token=config.token)
 
     # Create the Updater and pass it your bot's token.
@@ -529,7 +583,9 @@ def main():
     updater = Updater(token=config.token, use_context=True)
 
     user_dict = database.get_user_dict()
-    logging.info(user_dict)
+    #logging.info(user_dict)
+
+    poll_dict = dict()
 
     logger.info("Authorized on account %s. "
                 "version is %s" % (bot.username, config.version))
@@ -559,6 +615,8 @@ def main():
     dispatcher.add_handler(MessageHandler(~Filters.command & 
                                           (Filters.text | Filters.forwarded),
                                           hodor_hold_the_text_door))
+
+    dispatcher.add_handler(PollAnswerHandler(receive_poll_answer))
 
     dispatcher.add_handler(CallbackQueryHandler(button))
     dispatcher.add_handler(alarm_handler)

@@ -27,6 +27,7 @@ logger.setLevel(config.LOGGER_LEVEL)
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+
 #TODO: сделать коммиты при записи в бд и периодическое переоткрытие базы, чтобы легче было подменять ее
 class ignat_db_helper:
     """class helper for work with SQLite3 database
@@ -93,13 +94,33 @@ class ignat_db_helper:
     def get_waiting_list(self):
         pass
 
-
     # TODO: add delete method
-    def delete_from_waiting_list(self, chat_id, user_id, correct_answer, job_name):
-        pass
+    def delete_from_waiting_list(self,
+                                 chat_id,
+                                 user_id,
+                                 correct_answer,
+                                 job_name):
+        delete_from_waiting_list_Query = "delete from waiting_list \
+                                          where job_name = ?"
+
+        try:
+            logger.info(self.check_sql_string(delete_from_waiting_list_Query,
+                                              (job_name, )))
+            self.cursor.execute(delete_from_waiting_list_Query, (job_name, ))
+            self.connection.commit()
+        except Exception as e:
+            logger.error(e)
+            logger.error(self.check_sql_string(delete_from_waiting_list_Query,
+                                               (job_name, )))
+
+        return self.cursor.rowcount
 
 
-    def add_New_User_to_waiting_list(self, chat_id, user_id, correct_answer, job_name):
+    def add_New_User_to_waiting_list(self,
+                                     chat_id,
+                                     user_id,
+                                     correct_answer,
+                                     job_name):
         add_New_User_to_waiting_list_query = "insert into waiting_list\
                               (chat_id, user_id, correct_answer, job_name) values (?, ?, ?, ?)"
 
@@ -125,5 +146,20 @@ class ignat_db_helper:
             logger.error(e)
             logger.error(self.check_sql_string(set_Trusted_User_Query,
                                                (chat_id, user_id, )))
+
+        return self.cursor.rowcount
+
+    def set_Trusted_Users_in_newChat(self, chat_id):
+        set_Trusted_User_Query = ("update ignated_chat_users"
+                                  " set is_trusted = 1"
+                                  " where chat_id = ?")
+
+        try:
+            self.cursor.execute(set_Trusted_User_Query, (chat_id, ))
+            self.connection.commit()
+        except Exception as e:
+            logger.error(e)
+            logger.error(self.check_sql_string(set_Trusted_User_Query,
+                                               (chat_id, )))
 
         return self.cursor.rowcount
