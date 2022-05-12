@@ -89,13 +89,13 @@ def call_admins(update, context):
         user_names = update.message.from_user.first_name
     if update.message.from_user.last_name:
         user_names += ' ' + update.message.from_user.last_name
-                
-    username = 'person with no user name'	
+    message_id = update.message.message_id
+
+    username = 'person with no user name'
     if update.message.from_user.username:
         username = '@' + update.message.from_user.username
     # message_id = update.message.message_id
 
-    logger.info("call to arms")
     logger.info(user_id)
     logger.info(user_names)
     logger.info(username)
@@ -111,13 +111,20 @@ def call_admins(update, context):
     for single_admin in admin_list:
         result += ('\r\n' + single_admin)
 
-    new_str = update.message.text
+    # new_str = update.message.text
+    # logger.info(update.message.text)
 
     # update.message.reply_text(result, parse_mode="Markdown")
     result += "\r\nCall to arms from {} {}".format(user_names, username)
 
     logger.info(result)
-    update.message.reply_text(result)
+    if update.message.reply_to_message is None:
+        # update.message.reply_text(result)
+        context.bot.send_message(chat_id, result)
+
+    else:
+        update.message.reply_to_message.reply_text(result)
+    context.bot.deleteMessage(chat_id, message_id)
 
 
 def save_message_text_to_database(userID, userName, userMessageText,
@@ -339,21 +346,25 @@ def hodor_watch_the_user(update, context):
 
 
 def hodor_hold_the_URL_door(update, context):
-    chat_id = update.message.chat_id
-    user_id = update.message.from_user.id
-    message_id = update.message.message_id
-    save_message_text_to_database(update.message.from_user.id,
+#    chat_id = update.message.chat_id
+    if update.message.from_user is None:
+        user_id = -1
+    else:
+        user_id = update.message.from_user.id
+#    message_id = update.message.message_id
+    save_message_text_to_database(user_id,
                                   update.message.from_user.username,
                                   update.message.text, update.message.caption,
                                   update.message.parse_entities(),
                                   update.message.caption_entities)
-
+"""
     if not is_Trusted(chat_id, user_id):
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
         context.bot.kickChatMember(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
+"""
 
 
 def get_correct_captcha_answer_idx(captcha, from_user_id):
@@ -472,6 +483,8 @@ def button(update, context):
 
 
 def hodor_hold_the_text_door(update, context):
+    if update.message is None:
+        return
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
     message_id = update.message.message_id
