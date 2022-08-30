@@ -300,21 +300,25 @@ def hodor_watch_the_user(update, context):
 
             keyboard = [[InlineKeyboardButton(captcha_emoji[0],
                                               callback_data= config.btnCaptcha +
+                                              config.btn_data_separator +
                                               captcha_text[0] +
                                               config.btn_data_separator +
                                               str(new_member.id)),
                          InlineKeyboardButton(captcha_emoji[1],
                                               callback_data=config.btnCaptcha +
+                                              config.btn_data_separator +
                                               captcha_text[1] +
                                               config.btn_data_separator +
                                               str(new_member.id)),
                          InlineKeyboardButton(captcha_emoji[2],
                                               callback_data=config.btnCaptcha +
+                                              config.btn_data_separator +
                                               captcha_text[2] +
                                               config.btn_data_separator +
                                               str(new_member.id)),
                          InlineKeyboardButton(captcha_emoji[3],
                                               callback_data=config.btnCaptcha +
+                                              config.btn_data_separator +
                                               captcha_text[3] +
                                               config.btn_data_separator +
                                               str(new_member.id))]]
