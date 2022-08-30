@@ -46,11 +46,17 @@ logger.setLevel(config.LOGGER_LEVEL)
 
 
 @MWT(timeout=60 * 60)
-def get_admin_ids(bot, chat_id):
+def get_admin_usernames(bot, chat_id):
     """Returns a list of admin IDs for a given chat. Results are cached for 1 hour."""
     #return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
     admins_usernames_list = [('@' + admin.user.username) for admin in bot.get_chat_administrators(chat_id) if admin.user.is_bot == False]
     return admins_usernames_list
+
+
+@MWT(timeout=60 * 60)
+def get_admin_ids(bot, chat_id):
+    """Returns a list of all admin IDs for a given chat. Results are cached for 1 hour."""
+    return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
 
 
 def get_admins_usernamelist(bot, chat_id):
@@ -61,7 +67,7 @@ def get_admins_usernamelist(bot, chat_id):
         result_list.append('@ZhFfFTb')
         result_list.append('@Yankin66')
     else:
-        result_list = get_admin_ids(bot, chat_id)
+        result_list = get_admin_usernames(bot, chat_id)
 
     return result_list
 
@@ -113,17 +119,22 @@ def call_admins(update, context):
 
     # new_str = update.message.text
     # logger.info(update.message.text)
+    keyboard = [[InlineKeyboardButton("Удоли", callback_data=config.btnDelete
+                                               + config.btn_data_separator
+                                               + str(user_id))]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     # update.message.reply_text(result, parse_mode="Markdown")
+
     result += "\r\nCall to arms from {} {}".format(user_names, username)
 
     logger.info(result)
     if update.message.reply_to_message is None:
         # update.message.reply_text(result)
-        context.bot.send_message(chat_id, result)
+        context.bot.send_message(chat_id, result, reply_markup=reply_markup)
 
     else:
-        update.message.reply_to_message.reply_text(result)
+        update.message.reply_to_message.reply_text(result, reply_markup=reply_markup)
     context.bot.deleteMessage(chat_id, message_id)
 
 
@@ -288,19 +299,23 @@ def hodor_watch_the_user(update, context):
                                            until_date=until)
 
             keyboard = [[InlineKeyboardButton(captcha_emoji[0],
-                                              callback_data=captcha_text[0] +
+                                              callback_data= config.btnCaptcha +
+                                              captcha_text[0] +
                                               config.btn_data_separator +
                                               str(new_member.id)),
                          InlineKeyboardButton(captcha_emoji[1],
-                                              callback_data=captcha_text[1] +
+                                              callback_data=config.btnCaptcha +
+                                              captcha_text[1] +
                                               config.btn_data_separator +
                                               str(new_member.id)),
                          InlineKeyboardButton(captcha_emoji[2],
-                                              callback_data=captcha_text[2] +
+                                              callback_data=config.btnCaptcha +
+                                              captcha_text[2] +
                                               config.btn_data_separator +
                                               str(new_member.id)),
                          InlineKeyboardButton(captcha_emoji[3],
-                                              callback_data=captcha_text[3] +
+                                              callback_data=config.btnCaptcha +
+                                              captcha_text[3] +
                                               config.btn_data_separator +
                                               str(new_member.id))]]
 
@@ -382,104 +397,117 @@ def button(update, context):
     message_id = query.message.message_id
 
     querydata_list = query.data.split(config.btn_data_separator)
-    answer_from_captcha = querydata_list[0]
-    suspected_user_id = int(querydata_list[1])
+    if querydata_list[0] == config.btnCaptcha:
+        answer_from_captcha = querydata_list[1]
+        suspected_user_id = int(querydata_list[2])
 
-    job_name = str(chat_id) + config.job_name_separator + str(from_user_id)
-    global user_dict
+        job_name = str(chat_id) + config.job_name_separator + str(from_user_id)
+        global user_dict
 
-    # check if answer from potential spammer
+        # check if answer from potential spammer
 
-    logger.info("from_user_id %s" % from_user_id)
-    logger.info("suspected_user_id %s" % suspected_user_id)
-    logger.info(from_user_id == suspected_user_id)
+        logger.info("from_user_id %s" % from_user_id)
+        logger.info("suspected_user_id %s" % suspected_user_id)
+        logger.info(from_user_id == suspected_user_id)
 
-    if (from_user_id == suspected_user_id):
+        if (from_user_id == suspected_user_id):
 
-        logger.info("query.data: %s" % query.data)
-        logger.info("Message text: %s" % query.message.text)
+            logger.info("query.data: %s" % query.data)
+            logger.info("Message text: %s" % query.message.text)
 
-        correct_answer = waiting_dict[chat_id][from_user_id]
-        logger.info("Correct answer: %s" % correct_answer)
+            correct_answer = waiting_dict[chat_id][from_user_id]
+            logger.info("Correct answer: %s" % correct_answer)
 
-        if (correct_answer == answer_from_captcha):
-            logger.info('Correct answer from %s in %s' %
-                        (from_user_id, chat_id))
-            logger.debug('set_Trusted(%s, %s)' % (chat_id, from_user_id))
-            for j in context.job_queue.jobs():
-                if job_name in j.name:
-                    j.schedule_removal()
-            if set_Trusted(chat_id, from_user_id):
+            if (correct_answer == answer_from_captcha):
+                logger.info('Correct answer from %s in %s' %
+                            (from_user_id, chat_id))
+                logger.debug('set_Trusted(%s, %s)' % (chat_id, from_user_id))
+                for j in context.job_queue.jobs():
+                    if job_name in j.name:
+                        j.schedule_removal()
+                if set_Trusted(chat_id, from_user_id):
+                    user_dict = database.get_user_dict()
+
+                until = datetime.now()  # + timedelta(days=config.silence_timeout)
+                context.bot.restrictChatMember(chat_id, from_user_id,
+                                               permissions=config.UNBANNED,
+                                               until_date=until)
+                logging.info('Adding %s as trusted' % (from_user_id))
+                if add_Untrusted(chat_id, from_user_id):
+                    logging.info('Added %s as untrusted' % (from_user_id))
+
+                if set_Trusted(chat_id, from_user_id):
+                    logging.info('Setted %s as trusted' % (from_user_id))
+
                 user_dict = database.get_user_dict()
 
-            until = datetime.now()  # + timedelta(days=config.silence_timeout)
-            context.bot.restrictChatMember(chat_id, from_user_id,
-                                           permissions=config.UNBANNED,
-                                           until_date=until)
-            logging.info('Adding %s as trusted' % (from_user_id))
-            if add_Untrusted(chat_id, from_user_id):
-                logging.info('Added %s as untrusted' % (from_user_id))
+                try:
+                    remove_from_waiting_list(chat_id,
+                                             from_user_id,
+                                             '',
+                                             '')
+                    # TODO: call here remove from waiting table too
 
-            if set_Trusted(chat_id, from_user_id):
-                logging.info('Setted %s as trusted' % (from_user_id))
+                except Exception as e:
+                    logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
+                    logger.info(e)
 
-            user_dict = database.get_user_dict()
+                logger.info('waiting_dict is %s' % waiting_dict)
+                logging.info(user_dict[chat_id])
+            else:
+                # no correct answer given
+                # user_dict = add_Untrusted(chat_id, from_user_id)
+                # logging.info(user_dict)
 
-            try:
-                remove_from_waiting_list(chat_id,
-                                         from_user_id,
-                                         '',
-                                         '')
-                # TODO: call here remove from waiting table too
+                logger.info('No correct answer from %s in %s' %
+                            (chat_id, from_user_id))
 
-            except Exception as e:
-                logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
-                logger.info(e)
+                logger.info("job_name is %s" % job_name)
 
-            logger.info('waiting_dict is %s' % waiting_dict)
-            logging.info(user_dict[chat_id])
+                try:
+                    logger.info("jobs is %s" % context.job_queue.jobs())
+                except Exception as e:
+                    logger.info(e)
+
+                for j in context.job_queue.jobs():
+                    if j.name == job_name:
+                        j.schedule_removal()
+                logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
+                until = datetime.now() + timedelta(seconds=config.kick_timeout)
+                context.bot.kickChatMember(chat_id, from_user_id, until_date=until)
+
+                try:
+                    remove_from_waiting_list(chat_id,
+                                             from_user_id,
+                                             '',
+                                             '')
+                    # TODO: call here remove from waiting table too
+
+                except Exception as e:
+                    logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
+                    logger.info(e)
+
+                logger.info('waiting_dict is %s' % waiting_dict)
+                logger.info('Untrusted user %s has been removed'
+                            ' because of incorrect answer' % (from_user_id))
+
+            context.bot.delete_message(chat_id, message_id)
         else:
-            # no correct answer given
-            # user_dict = add_Untrusted(chat_id, from_user_id)
-            # logging.info(user_dict)
+            pass
+    #        context.bot.send_message(chat_id,
+    #                                 "Ответить должен тот, кого спрашивают")
+    elif querydata_list[0] == config.btnDelete:
+        callToArm_user_id = int(querydata_list[1])
 
-            logger.info('No correct answer from %s in %s' %
-                        (chat_id, from_user_id))
+        listWhoCanDelete = list()
+        listWhoCanDelete = get_admin_ids(context.bot, chat_id)
+        listWhoCanDelete.append(int(callToArm_user_id))
 
-            logger.info("job_name is %s" % job_name)
-
-            try:
-                logger.info("jobs is %s" % context.job_queue.jobs())
-            except Exception as e:
-                logger.info(e)
-
-            for j in context.job_queue.jobs():
-                if j.name == job_name:
-                    j.schedule_removal()
-            logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
-            until = datetime.now() + timedelta(seconds=config.kick_timeout)
-            context.bot.kickChatMember(chat_id, from_user_id, until_date=until)
-
-            try:
-                remove_from_waiting_list(chat_id,
-                                         from_user_id,
-                                         '',
-                                         '')
-                # TODO: call here remove from waiting table too
-
-            except Exception as e:
-                logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
-                logger.info(e)
-
-            logger.info('waiting_dict is %s' % waiting_dict)
-            logger.info('Untrusted user %s has been removed'
-                        ' because of incorrect answer' % (from_user_id))
-
-        context.bot.delete_message(chat_id, message_id)
-    else:
-        pass
-#        context.bot.send_message(chat_id,
-#                                 "Ответить должен тот, кого спрашивают")
+        if (from_user_id in listWhoCanDelete):
+            logger.info('DELETE call from correct user')
+            context.bot.deleteMessage(chat_id, message_id)
+        else:
+            pass
 
 
 def hodor_hold_the_text_door(update, context):
@@ -498,7 +526,7 @@ def hodor_hold_the_text_door(update, context):
     if ((is_chineese.is_chineese(update.message.text) or
          is_chineese.is_chineese(update.message.caption)) and
             is_Trusted(chat_id, user_id) is not True):
-        context.bot.delete_message(chat_id, message_id)
+        #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
         context.bot.kickChatMember(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
@@ -506,12 +534,12 @@ def hodor_hold_the_text_door(update, context):
                     ' because of link in first message' % (user_id))
         return
 
-    if update.message.reply_markup is not None:
+    if update.message.reply_markup is not None and is_Trusted(chat_id, user_id) is not True:
         logger.info('from [%s][%s] was keyboard in forward: %s ' %
                     (update.message.from_user.id,
                      update.message.from_user.username,
                      update.message.reply_markup))
-        context.bot.delete_message(chat_id, message_id)
+        #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
         context.bot.kickChatMember(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
@@ -542,7 +570,8 @@ def main():
     updater = Updater(token=config.token, use_context=True)
 
     user_dict = database.get_user_dict()
-    logging.info(user_dict)
+    if not config.debug:
+        logging.info(user_dict)
 
     logger.info("Authorized on account %s. "
                 "version is %s" % (bot.username, config.version))
@@ -554,9 +583,13 @@ def main():
 #                                   call_admins,
 #                                   (Filters.user(username='@guestl') & Filters.command))
 
-    alarm_handler = CommandHandler('alrm',
-                                   call_admins,
-                                   (Filters.command))
+    alarm_handler_alrm = CommandHandler('alrm',
+                                        call_admins,
+                                        (Filters.command))
+
+    alarm_handler_alarm = CommandHandler('alarm',
+                                         call_admins,
+                                         (Filters.command))
 
     dispatcher.add_handler(MessageHandler
                            (Filters.status_update.new_chat_members,
@@ -574,7 +607,8 @@ def main():
                                           hodor_hold_the_text_door))
 
     dispatcher.add_handler(CallbackQueryHandler(button))
-    dispatcher.add_handler(alarm_handler)
+    dispatcher.add_handler(alarm_handler_alrm)
+    dispatcher.add_handler(alarm_handler_alarm)
 
     # log all errors
     # dispatcher.add_error_handler(error)
