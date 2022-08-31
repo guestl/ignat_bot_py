@@ -48,4 +48,3 @@ UNBANNED = ChatPermissions(can_send_messages=True,
                            can_pin_messages=None)
 
 default_locale = 'ru'
-alarm_commands = 'alrm'
