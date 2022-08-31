@@ -12,6 +12,7 @@ from logging.handlers import RotatingFileHandler
 
 # Importing token from config file
 import config
+from token import token
 from ignat_db_helper import ignat_db_helper
 
 from handlers.keyboard_captcha import tg_kb_captcha
@@ -47,7 +48,8 @@ logger.setLevel(config.LOGGER_LEVEL)
 
 @MWT(timeout=60 * 60)
 def get_admin_usernames(bot, chat_id):
-    """Returns a list of admin IDs for a given chat. Results are cached for 1 hour."""
+    """Returns a list of admin IDs for a given chat. 
+       Results are cached for 1 hour."""
     #return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
     admins_usernames_list = [('@' + admin.user.username) for admin in bot.get_chat_administrators(chat_id) if admin.user.is_bot == False]
     return admins_usernames_list
@@ -55,7 +57,8 @@ def get_admin_usernames(bot, chat_id):
 
 @MWT(timeout=60 * 60)
 def get_admin_ids(bot, chat_id):
-    """Returns a list of all admin IDs for a given chat. Results are cached for 1 hour."""
+    """Returns a list of all admin IDs for a given chat. 
+       Results are cached for 1 hour."""
     return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
 
 
@@ -205,6 +208,7 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
     context.bot.deleteMessage(chat_id, message_id)
     context.bot.deleteMessage(chat_id, reply_message_id)
     until_date = datetime.now() + timedelta(seconds=config.kick_timeout)
+
     context.bot.kickChatMember(chat_id, user_id, until_date=until_date)
     try:
         # TODO: call here remove from waiting list
@@ -293,7 +297,7 @@ def hodor_watch_the_user(update, context):
             for single_captcha in captcha_text:
                 captcha_emoji.append(emojize(single_captcha, use_aliases=True))
 
-            until = datetime.now() + timedelta(days=config.silence_timeout)
+            until = datetime.now() + timedelta(minutes=config.silence_timeout)
             context.bot.restrictChatMember(chat_id, user_id,
                                            permissions=config.READ_ONLY,
                                            until_date=until)
@@ -566,12 +570,12 @@ def error(update, context):
 
 def main():
     global user_dict
-    bot = telegram.Bot(token=config.token)
+    bot = telegram.Bot(token=token)
 
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
-    updater = Updater(token=config.token, use_context=True)
+    updater = Updater(token=token, use_context=True)
 
     user_dict = database.get_user_dict()
     if not config.debug:
@@ -595,6 +599,10 @@ def main():
                                          call_admins,
                                          (Filters.command))
 
+    alarm_handler_sos = CommandHandler('sos',
+                                       call_admins,
+                                       (Filters.command))
+
     dispatcher.add_handler(MessageHandler
                            (Filters.status_update.new_chat_members,
                             hodor_watch_the_user))
@@ -613,6 +621,7 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(button))
     dispatcher.add_handler(alarm_handler_alrm)
     dispatcher.add_handler(alarm_handler_alarm)
+    dispatcher.add_handler(alarm_handler_sos)
 
     # log all errors
     # dispatcher.add_error_handler(error)

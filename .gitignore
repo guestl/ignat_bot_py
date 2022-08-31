@@ -120,7 +120,6 @@ $RECYCLE.BIN/
 db/sftp-config.json
 ignat_bot.service
 sftp-config.json
-src/config.py
 src/fd.txt
 src/webhook curl.txt
 *.service
@@ -378,3 +377,4 @@ src/ignat_bot2.py
 src/ignat_bot3.py
 src/tt.py
 src/echo_server.py
+src/token.py
