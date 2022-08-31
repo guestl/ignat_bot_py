@@ -3,9 +3,9 @@ from telegram import ChatPermissions
 
 
 LOGGER_LEVEL = logging.INFO
-debug = False
+debug = True
 
-version = 0.24.10
+version = "0.24.10"
 
 dbname = '../db/ignat_db.db'
 

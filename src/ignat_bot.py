@@ -12,7 +12,7 @@ from logging.handlers import RotatingFileHandler
 
 # Importing token from config file
 import config
-from token import token
+from tgtoken import tgtoken
 from ignat_db_helper import ignat_db_helper
 
 from handlers.keyboard_captcha import tg_kb_captcha
@@ -570,12 +570,12 @@ def error(update, context):
 
 def main():
     global user_dict
-    bot = telegram.Bot(token=token)
+    bot = telegram.Bot(token=tgtoken)
 
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
-    updater = Updater(token=token, use_context=True)
+    updater = Updater(token=tgtoken, use_context=True)
 
     user_dict = database.get_user_dict()
     if not config.debug:
