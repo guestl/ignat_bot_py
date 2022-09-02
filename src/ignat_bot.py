@@ -515,7 +515,8 @@ def button(update, context):
             logger.info('DELETE call from correct user')
             context.bot.deleteMessage(chat_id, message_id)
         else:
-            pass
+            #pass
+            context.bot.answer_callback_query(query.id, text="Удоляет или автор, или одмины")
 
 
 def hodor_hold_the_text_door(update, context):
