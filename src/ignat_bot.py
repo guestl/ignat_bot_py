@@ -32,6 +32,8 @@ user_dict = {}
 waiting_dict = {}
 
 database = ignat_db_helper()
+stg_kb_captcha = tg_kb_captcha()
+
 
 # Logging module for debugging
 log_format = '%(asctime)s %(filename)-12s %(funcName)s %(lineno)d %(message)s'
@@ -141,7 +143,7 @@ def call_admins(update, context):
     context.bot.deleteMessage(chat_id, message_id)
 
 
-def save_message_text_to_database(userID, userName, userMessageText,
+def save_message_text_to_database(chat_id, userID, userName, userMessageText,
                                   userMessageCaption, userMessageEntities,
                                   userMessageCaptionEntities):
     logger.info('from [%s][%s] was text: %s ' %
@@ -152,6 +154,8 @@ def save_message_text_to_database(userID, userName, userMessageText,
                 (userID, userName, userMessageEntities))
     logger.info('from [%s][%s] was captionEntities: %s ' %
                 (userID, userName, userMessageCaptionEntities))
+    if userMessageText:
+        database.save_message(chat_id, userID, userMessageText)
 
 
 def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
@@ -257,7 +261,8 @@ def hodor_watch_the_user(update, context):
                   update.message.from_user.username,
                   update.message.from_user.language_code))
 
-    save_message_text_to_database(update.message.from_user.id,
+    save_message_text_to_database(update.message.chat_id,
+                                  update.message.from_user.id,
                                   update.message.from_user.username,
                                   update.message.text, update.message.caption,
                                   update.message.parse_entities(),
@@ -288,7 +293,7 @@ def hodor_watch_the_user(update, context):
             user_dict[chat_id] = {}
 
         if new_member.id not in user_dict[chat_id].keys():
-            captcha_text = tg_kb_captcha().get_today_captcha(tg_kb_captcha)
+            captcha_text = stg_kb_captcha.get_today_captcha(tg_kb_captcha)
             logging.info('captcha text is %s' % (captcha_text))
 
             # TODO: Transfert emoji back to keyboard_captcha class
@@ -330,7 +335,7 @@ def hodor_watch_the_user(update, context):
             reply_markup = InlineKeyboardMarkup(keyboard)
             correct_answer = get_correct_captcha_answer_idx(captcha_text,
                                                             user_id)
-            correct_btn_description = tg_kb_captcha().get_captcha_answer(correct_answer)
+            correct_btn_description = stg_kb_captcha.get_captcha_answer(correct_answer)
 
             if new_member.username:
                 welcome_text = ('@%s чтобы доказать, что не бот,'
@@ -375,7 +380,8 @@ def hodor_hold_the_URL_door(update, context):
     else:
         user_id = update.message.from_user.id
 #    message_id = update.message.message_id
-    save_message_text_to_database(user_id,
+    save_message_text_to_database(update.message.chat_id,
+                                  user_id,
                                   update.message.from_user.username,
                                   update.message.text, update.message.caption,
                                   update.message.parse_entities(),
@@ -526,7 +532,8 @@ def hodor_hold_the_text_door(update, context):
     user_id = update.message.from_user.id
     message_id = update.message.message_id
     global user_dict
-    save_message_text_to_database(update.message.from_user.id,
+    save_message_text_to_database(update.message.chat_id,
+                                  update.message.from_user.id,
                                   update.message.from_user.username,
                                   update.message.text, update.message.caption,
                                   update.message.parse_entities(),
@@ -571,6 +578,7 @@ def error(update, context):
 
 def main():
     global user_dict
+
     bot = telegram.Bot(token=tgtoken)
 
     # Create the Updater and pass it your bot's token.

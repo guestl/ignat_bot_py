@@ -1,37 +1,23 @@
 from random import shuffle
+from random import uniform
+import json
 
 
 class tg_kb_captcha():
-    default_len = 4
+    def __init__(self):
+        self.default_len = 4
+        self.kb_filename = './kaptcha.json'
+        self.new_captcha = dict()
 
-    new_captcha = {":alarm_clock:": ["будильник", "часы"],
-                   ":potato:": ["Картофель", "Картошка"],
-                   ":carrot:": ["Морковка", "Оранжевый корнеплод"],
-                   ":soccer_ball:": ["Футбольный мяч", "Круглая штука для футбола"],
-                   ":banana:": ["Бaнан"],
-                   ":lemon:": ["Лимoн"],
-                   ":red_apple:": ["Красное яблoко"],
-                   ":strawberry:": ["Ягoда"],
-                   ":beer_mug:": ["Что-то с пивом", "Емкость для пива"],
-                   ":baby_bottle:": ["Детская бутылочкa"],
-                   ":wine_glass:": ["Bино"],
-                   ":cup_with_straw:": ["Стакан для коктейля"],
-                   ":bus:": ["Автобуc", "Машина, где возят людей"],
-                   ":locomotive:": ["Локомoтив ", "Паравоз "],
-                   ":ambulance:": ["Скоpая помощь ", "Машина  врачей"],
-                   ":fire_engine:": ["Пожарнaя  машина", " Машина пожарных"],
-                   ":ringed_planet:": ["Сaтурн ", "Планета  с кольцами"],
-                   ":crescent_moon:": ["Полумeсяц ", "Кусок  луны"],
-                   ":snowflake:": ["Частица снега"],
-                   ":fire:": ["Огoнь"],
-                   ":droplet:": ["Кaпля воды"],
-                   ":cloud:": ["Oблако "],
-                   ":coffin:": ["Гpоб ", "Коробка для трупа"],
-                   ":water_closet:": ["Табличка  туалета"],
-                   ":no_entry:": ["Проезд  запрещен", "Дорожный запрещающий знак"],
-                   ":radioactive:": ["Радиоактивная  oпасность"]}
+        #with open(self.kb_filename, 'w', encoding='utf8') as f:
+        #    json.dump(self.new_captcha, f, ensure_ascii=False,
+        #               sort_keys=True, indent=4, )
 
     def get_today_captcha(self, captcha_len):
+        if uniform(0, 2) < 1.6 or bool(self.new_captcha) is False:
+            with open(self.kb_filename, 'r', encoding='utf8') as f:
+                self.new_captcha = json.load(f)
+
         if type(captcha_len) is not int or captcha_len < 1:
             captcha_len = self.default_len
 
@@ -46,6 +32,10 @@ class tg_kb_captcha():
         return result_captcha[-captcha_len:]
 
     def get_captcha_answer(self, captcha_idx):
+        if bool(self.new_captcha) is False:
+            with open(self.kb_filename, 'r', encoding='utf8') as f:
+                self.new_captcha = json.load(f)
+
         ret_list = self.new_captcha[captcha_idx]
         shuffle(ret_list)
         return ret_list[-1]

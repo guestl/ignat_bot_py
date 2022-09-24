@@ -115,7 +115,6 @@ class ignat_db_helper:
 
         return self.cursor.rowcount
 
-
     def add_New_User_to_waiting_list(self,
                                      chat_id,
                                      user_id,
@@ -161,5 +160,22 @@ class ignat_db_helper:
             logger.error(e)
             logger.error(self.check_sql_string(set_Trusted_User_Query,
                                                (chat_id, )))
+
+        return self.cursor.rowcount
+
+    def save_message(self,
+                     chat_id,
+                     user_id,
+                     message_text):
+        save_message_query = "insert into messages\
+                              (chat_id, user_id, message_text) values (?, ?, ?)"
+
+        try:
+            self.cursor.execute(save_message_query, (chat_id, user_id, message_text, ))
+            self.connection.commit()
+        except Exception as e:
+            logger.error(e)
+            logger.error(self.check_sql_string(save_message_query,
+                                               (chat_id, user_id, message_text, )))
 
         return self.cursor.rowcount
