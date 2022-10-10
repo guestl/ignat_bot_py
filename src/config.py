@@ -5,7 +5,7 @@ from telegram import ChatPermissions
 LOGGER_LEVEL = logging.INFO
 debug = True
 
-version = "0.24.30"
+version = "0.24.40"
 
 dbname = '../db/ignat_db.db'
 
@@ -48,3 +48,5 @@ UNBANNED = ChatPermissions(can_send_messages=True,
                            can_pin_messages=None)
 
 default_locale = 'ru'
+black_list_filename = 'blacklist.txt'
+kick_bl_timeout = 60

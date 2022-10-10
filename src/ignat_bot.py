@@ -26,7 +26,6 @@ from emoji import emojize
 
 # TODO: possibility to change language + admin panel
 # TODO: nextgen captcha
-# TODO: change log format, remove text message logging
 
 user_dict = {}
 waiting_dict = {}
@@ -62,6 +61,24 @@ def get_admin_ids(bot, chat_id):
     """Returns a list of all admin IDs for a given chat. 
        Results are cached for 1 hour."""
     return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
+
+
+@MWT(timeout=60 * 60)
+def get_blacklist(chat_id):
+    """Returns a list of blacklisted words for the chat."""
+    bl_cnt = ''
+    with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
+        bl_cnt = bl_f.read()
+    return bl_cnt
+
+
+def check_for_bl(text_for_check, chat_id):
+    word_list = text_for_check.split()
+    print(word_list)
+    for single_word in word_list:
+        if single_word in get_blacklist(chat_id):
+            return True
+    return False
 
 
 def get_admins_usernamelist(bot, chat_id):
@@ -146,16 +163,17 @@ def call_admins(update, context):
 def save_message_text_to_database(chat_id, userID, userName, userMessageText,
                                   userMessageCaption, userMessageEntities,
                                   userMessageCaptionEntities):
-    logger.info('from [%s][%s] was text: %s ' %
-                (userID, userName, userMessageText))
-    logger.info('from [%s][%s] was caption: %s ' %
-                (userID, userName, userMessageCaption))
-    logger.info('from [%s][%s] was messageEntities: %s ' %
-                (userID, userName, userMessageEntities))
-    logger.info('from [%s][%s] was captionEntities: %s ' %
-                (userID, userName, userMessageCaptionEntities))
     if userMessageText:
         database.save_message(chat_id, userID, userMessageText)
+    else:
+        logger.info('from [%s][%s] was text: %s ' %
+                    (userID, userName, userMessageText))
+        logger.info('from [%s][%s] was caption: %s ' %
+                    (userID, userName, userMessageCaption))
+        logger.info('from [%s][%s] was messageEntities: %s ' %
+                    (userID, userName, userMessageEntities))
+        logger.info('from [%s][%s] was captionEntities: %s ' %
+                    (userID, userName, userMessageCaptionEntities))
 
 
 def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
@@ -213,9 +231,8 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
     context.bot.deleteMessage(chat_id, reply_message_id)
     until_date = datetime.now() + timedelta(seconds=config.kick_timeout)
 
-    context.bot.kickChatMember(chat_id, user_id, until_date=until_date)
+    context.bot.ban_chat_member(chat_id, user_id, until_date=until_date)
     try:
-        # TODO: call here remove from waiting list
         remove_from_waiting_list(chat_id, user_id, '', '')
     except Exception as e:
         logger.info('Error while deleting %s from %s' % (chat_id, user_id))
@@ -283,7 +300,7 @@ def hodor_watch_the_user(update, context):
         if (is_chineese.is_chineese(new_member.username) or
                 is_chineese.is_chineese(new_member.full_name)):
             until = datetime.now() + timedelta(seconds=config.kick_timeout)
-            context.bot.kickChatMember(chat_id, user_id, until_date=until)
+            context.bot.ban_chat_member(chat_id, user_id, until_date=until)
             context.bot.deleteMessage(chat_id, message_id)
             logger.info('Chinese user %s with username %s fullname %s has been removed\
                         ' % (user_id, new_member.username, new_member.full_name))
@@ -389,7 +406,7 @@ def hodor_hold_the_URL_door(update, context):
 """
     if not is_Trusted(chat_id, user_id):
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.kickChatMember(chat_id, user_id, until_date=until)
+        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
@@ -488,7 +505,7 @@ def button(update, context):
                         j.schedule_removal()
                 logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
                 until = datetime.now() + timedelta(seconds=config.kick_timeout)
-                context.bot.kickChatMember(chat_id, from_user_id, until_date=until)
+                context.bot.ban_chat_member(chat_id, from_user_id, until_date=until)
 
                 try:
                     remove_from_waiting_list(chat_id,
@@ -544,7 +561,7 @@ def hodor_hold_the_text_door(update, context):
             is_Trusted(chat_id, user_id) is not True):
         #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.kickChatMember(chat_id, user_id, until_date=until)
+        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
@@ -557,10 +574,20 @@ def hodor_hold_the_text_door(update, context):
                      update.message.reply_markup))
         #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.kickChatMember(chat_id, user_id, until_date=until)
+        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of keyboard in first message' % (user_id))
+
+    if check_for_bl(update.message.text, chat_id):
+        logger.info(update.message.text)
+        until = datetime.now() + timedelta(seconds=config.kick_bl_timeout)
+        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
+        context.bot.unban_chat_member(chat_id, user_id)
+        context.bot.deleteMessage(chat_id, message_id)
+        logger.info('User %s has been temporarily removed'
+                    ' because of blacklisted word in the message' % (user_id))
+        return
 
     if is_Trusted(chat_id, user_id) is False:
         if set_Trusted(chat_id, user_id):
