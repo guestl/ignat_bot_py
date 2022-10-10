@@ -58,7 +58,7 @@ def get_admin_usernames(bot, chat_id):
 
 @MWT(timeout=60 * 60)
 def get_admin_ids(bot, chat_id):
-    """Returns a list of all admin IDs for a given chat. 
+    """Returns a list of all admin IDs for a given chat.
        Results are cached for 1 hour."""
     return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
 
@@ -66,10 +66,10 @@ def get_admin_ids(bot, chat_id):
 @MWT(timeout=60 * 60)
 def get_blacklist(chat_id):
     """Returns a list of blacklisted words for the chat."""
-    bl_cnt = ''
+    bl_context = ''
     with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
-        bl_cnt = bl_f.read()
-    return bl_cnt
+        bl_context = bl_f.read()
+    return bl_context
 
 
 def check_for_bl(text_for_check, chat_id):
@@ -579,7 +579,7 @@ def hodor_hold_the_text_door(update, context):
         logger.info('Untrusted user %s has been removed'
                     ' because of keyboard in first message' % (user_id))
 
-    if check_for_bl(update.message.text, chat_id):
+    if update.message.text is not None and check_for_bl(update.message.text, chat_id):
         logger.info(update.message.text)
         until = datetime.now() + timedelta(seconds=config.kick_bl_timeout)
         context.bot.ban_chat_member(chat_id, user_id, until_date=until)
