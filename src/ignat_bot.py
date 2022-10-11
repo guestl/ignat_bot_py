@@ -69,7 +69,7 @@ def get_blacklist(chat_id):
     bl_ctx_list = list()
     with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
         bl_ctx_list = bl_f.read().split('\n')
-    return bl_ctx_list
+    return list(filter(None, bl_ctx_list))
 
 
 def check_for_bl(text_from_user, chat_id):
