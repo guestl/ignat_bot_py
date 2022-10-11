@@ -101,18 +101,17 @@ class ignat_db_helper:
                                  correct_answer,
                                  job_name):
         delete_from_waiting_list_Query = "delete from waiting_list \
-                                          where job_name = ?"
+                                          where chat_id = ? and user_id = ?"
 
         try:
             logger.info(self.check_sql_string(delete_from_waiting_list_Query,
-                                              (job_name, )))
-            self.cursor.execute(delete_from_waiting_list_Query, (job_name, ))
+                                              (chat_id, user_id, )))
+            self.cursor.execute(delete_from_waiting_list_Query, (chat_id, user_id, ))
             self.connection.commit()
         except Exception as e:
             logger.error(e)
             logger.error(self.check_sql_string(delete_from_waiting_list_Query,
-                                               (job_name, )))
-
+                                               (chat_id, user_id, )))
         return self.cursor.rowcount
 
     def add_New_User_to_waiting_list(self,

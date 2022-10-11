@@ -66,17 +66,15 @@ def get_admin_ids(bot, chat_id):
 @MWT(timeout=60 * 60)
 def get_blacklist(chat_id):
     """Returns a list of blacklisted words for the chat."""
-    bl_context = ''
+    bl_ctx_list = list()
     with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
-        bl_context = bl_f.read()
-    return bl_context
+        bl_ctx_list = bl_f.read().split('\n')
+    return bl_ctx_list
 
 
-def check_for_bl(text_for_check, chat_id):
-    word_list = text_for_check.split()
-    print(word_list)
-    for single_word in word_list:
-        if single_word in get_blacklist(chat_id):
+def check_for_bl(text_from_user, chat_id):
+    for single_black_item in get_blacklist(chat_id):
+        if single_black_item in text_from_user:
             return True
     return False
 
@@ -231,7 +229,7 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
     context.bot.deleteMessage(chat_id, reply_message_id)
     until_date = datetime.now() + timedelta(seconds=config.kick_timeout)
 
-    context.bot.ban_chat_member(chat_id, user_id, until_date=until_date)
+    context.bot.kick_chat_member(chat_id, user_id, until_date=until_date)
     try:
         remove_from_waiting_list(chat_id, user_id, '', '')
     except Exception as e:
@@ -300,7 +298,7 @@ def hodor_watch_the_user(update, context):
         if (is_chineese.is_chineese(new_member.username) or
                 is_chineese.is_chineese(new_member.full_name)):
             until = datetime.now() + timedelta(seconds=config.kick_timeout)
-            context.bot.ban_chat_member(chat_id, user_id, until_date=until)
+            context.bot.kick_chat_member(chat_id, user_id, until_date=until)
             context.bot.deleteMessage(chat_id, message_id)
             logger.info('Chinese user %s with username %s fullname %s has been removed\
                         ' % (user_id, new_member.username, new_member.full_name))
@@ -406,7 +404,7 @@ def hodor_hold_the_URL_door(update, context):
 """
     if not is_Trusted(chat_id, user_id):
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
+        context.bot.kick_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
@@ -476,7 +474,7 @@ def button(update, context):
                     remove_from_waiting_list(chat_id,
                                              from_user_id,
                                              '',
-                                             '')
+                                             job_name)
                     # TODO: call here remove from waiting table too
 
                 except Exception as e:
@@ -505,13 +503,13 @@ def button(update, context):
                         j.schedule_removal()
                 logger.debug('ban_Spammer(%s, %s)' % (chat_id, from_user_id))
                 until = datetime.now() + timedelta(seconds=config.kick_timeout)
-                context.bot.ban_chat_member(chat_id, from_user_id, until_date=until)
+                context.bot.kick_chat_member(chat_id, from_user_id, until_date=until)
 
                 try:
                     remove_from_waiting_list(chat_id,
                                              from_user_id,
                                              '',
-                                             '')
+                                             job_name)
                     # TODO: call here remove from waiting table too
 
                 except Exception as e:
@@ -561,7 +559,7 @@ def hodor_hold_the_text_door(update, context):
             is_Trusted(chat_id, user_id) is not True):
         #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
+        context.bot.kick_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
@@ -574,7 +572,7 @@ def hodor_hold_the_text_door(update, context):
                      update.message.reply_markup))
         #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
+        context.bot.kick_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of keyboard in first message' % (user_id))
@@ -582,11 +580,11 @@ def hodor_hold_the_text_door(update, context):
     if update.message.text is not None and check_for_bl(update.message.text, chat_id):
         logger.info(update.message.text)
         until = datetime.now() + timedelta(seconds=config.kick_bl_timeout)
-        context.bot.ban_chat_member(chat_id, user_id, until_date=until)
-        context.bot.unban_chat_member(chat_id, user_id)
+        context.bot.kick_chat_member(chat_id, user_id, until_date=until)
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('User %s has been temporarily removed'
                     ' because of blacklisted word in the message' % (user_id))
+        context.bot.unban_chat_member(chat_id, user_id)
         return
 
     if is_Trusted(chat_id, user_id) is False:
