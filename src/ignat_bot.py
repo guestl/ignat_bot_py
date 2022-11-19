@@ -163,15 +163,15 @@ def save_message_text_to_database(chat_id, userID, userName, userMessageText,
                                   userMessageCaptionEntities):
     if userMessageText:
         database.save_message(chat_id, userID, userMessageText)
-    else:
-        logger.info('from [%s][%s] was text: %s ' %
-                    (userID, userName, userMessageText))
-        logger.info('from [%s][%s] was caption: %s ' %
-                    (userID, userName, userMessageCaption))
-        logger.info('from [%s][%s] was messageEntities: %s ' %
-                    (userID, userName, userMessageEntities))
-        logger.info('from [%s][%s] was captionEntities: %s ' %
-                    (userID, userName, userMessageCaptionEntities))
+    # else:
+    #    logger.info('from [%s][%s] was text: %s ' %
+    #                (userID, userName, userMessageText))
+    #    logger.info('from [%s][%s] was caption: %s ' %
+    #                (userID, userName, userMessageCaption))
+    #    logger.info('from [%s][%s] was messageEntities: %s ' %
+    #                (userID, userName, userMessageEntities))
+    #    logger.info('from [%s][%s] was captionEntities: %s ' %
+    #                (userID, userName, userMessageCaptionEntities))
 
 
 def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
@@ -318,9 +318,15 @@ def hodor_watch_the_user(update, context):
                 captcha_emoji.append(emojize(single_captcha, use_aliases=True))
 
             until = datetime.now() + timedelta(minutes=config.silence_timeout)
-            context.bot.restrictChatMember(chat_id, user_id,
-                                           permissions=config.READ_ONLY,
-                                           until_date=until)
+            try:
+                context.bot.restrictChatMember(chat_id, user_id,
+                                               permissions=config.READ_ONLY,
+                                               until_date=until)
+            except Exception as e:
+                logging.error('Error while unrestrict user')
+                logging.error('known chats are -1001253360480,-1001732066603, -1001076839211')
+                logging.error('chat_id = ' + str(chat_id))
+                logging.error('from_user_id = ' + str(from_user_id))
 
             keyboard = [[InlineKeyboardButton(captcha_emoji[0],
                                               callback_data= config.btnCaptcha +
@@ -389,18 +395,19 @@ def hodor_watch_the_user(update, context):
 
 
 def hodor_hold_the_URL_door(update, context):
+    pass
 #    chat_id = update.message.chat_id
-    if update.message.from_user is None:
-        user_id = -1
-    else:
-        user_id = update.message.from_user.id
+#    if update.message.from_user is None:
+#        user_id = -1
+#    else:
+#        user_id = update.message.from_user.id
 #    message_id = update.message.message_id
-    save_message_text_to_database(update.message.chat_id,
-                                  user_id,
-                                  update.message.from_user.username,
-                                  update.message.text, update.message.caption,
-                                  update.message.parse_entities(),
-                                  update.message.caption_entities)
+#    save_message_text_to_database(update.message.chat_id,
+#                                  user_id,
+#                                  update.message.from_user.username,
+#                                  update.message.text, update.message.caption,
+#                                  update.message.parse_entities(),
+#                                  update.message.caption_entities)
 """
     if not is_Trusted(chat_id, user_id):
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
@@ -458,9 +465,15 @@ def button(update, context):
                     user_dict = database.get_user_dict()
 
                 until = datetime.now()  # + timedelta(days=config.silence_timeout)
-                context.bot.restrictChatMember(chat_id, from_user_id,
-                                               permissions=config.UNBANNED,
-                                               until_date=until)
+                try:
+                    context.bot.restrictChatMember(chat_id, from_user_id,
+                                                   permissions=config.UNBANNED,
+                                                   until_date=until)
+                except Exception as e:
+                    logging.error('Error while restrict user')
+                    logging.error('known chats are -1001253360480,-1001732066603, -1001076839211')
+                    logging.error('chat_id = ' + str(chat_id))
+                    logging.error('from_user_id = ' + str(from_user_id))
                 logging.info('Adding %s as trusted' % (from_user_id))
                 if add_Untrusted(chat_id, from_user_id):
                     logging.info('Added %s as untrusted' % (from_user_id))
@@ -482,7 +495,7 @@ def button(update, context):
                     logger.info(e)
 
                 logger.info('waiting_dict is %s' % waiting_dict)
-                logging.info(user_dict[chat_id])
+                # logging.info(user_dict[chat_id])
             else:
                 # no correct answer given
                 # user_dict = add_Untrusted(chat_id, from_user_id)
@@ -522,9 +535,8 @@ def button(update, context):
 
             context.bot.delete_message(chat_id, message_id)
         else:
-            pass
-    #        context.bot.send_message(chat_id,
-    #                                 "Ответить должен тот, кого спрашивают")
+            context.bot.answer_callback_query(query.id, text="Ответить должен тот, кого спрашивают")
+            #pass
     elif querydata_list[0] == config.btnDelete:
         callToArm_user_id = int(querydata_list[1])
 
@@ -611,12 +623,12 @@ def main():
     # Post version 12 this will no longer be necessary
     updater = Updater(token=tgtoken, use_context=True)
 
-    user_dict = database.get_user_dict()
-    if not config.debug:
-        logging.info(user_dict)
-
     logger.info("Authorized on account %s. "
                 "version is %s" % (bot.username, config.version))
+
+    user_dict = database.get_user_dict()
+    if not config.debug:
+        logging.info(len(user_dict))
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
