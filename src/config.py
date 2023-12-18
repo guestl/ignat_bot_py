@@ -2,10 +2,10 @@ import logging
 from telegram import ChatPermissions
 
 
-LOGGER_LEVEL = logging.INFO
+LOGGER_LEVEL = logging.DEBUG
 debug = True
 
-version = "0.24.40"
+version = "0.24.41"
 
 dbname = '../db/ignat_db.db'
 

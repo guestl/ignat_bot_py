@@ -178,3 +178,16 @@ class ignat_db_helper:
                                                (chat_id, user_id, message_text, )))
 
         return self.cursor.rowcount
+
+    # TODO: add retrieve method
+    def save_stat_info(self, chat_id, ban_reason):
+        save_message_query = "insert into stat_info\
+                              (chat_id, ban_reason) values (?, ?)"
+
+        try:
+            self.cursor.execute(save_message_query, (chat_id, ban_reason, ))
+            self.connection.commit()
+        except Exception as e:
+            logger.error(e)
+            logger.error(self.check_sql_string(save_message_query,
+                                               (chat_id, ban_reason, )))
