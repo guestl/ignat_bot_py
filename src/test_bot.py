@@ -122,6 +122,12 @@ def call_admins(update, context):
 
     logger.info(result)
     update.message.reply_text(result)
+    try:
+        save_ban_statinfo(chat_id, 'call_admins')
+    except Exception as e:
+        logger.info('error during posting stat info')
+        logger.info(e)
+
 
 
 def save_message_text_to_database(userID, userName, userMessageText,
@@ -199,6 +205,12 @@ def ban_Spammer(context: telegram.ext.CallbackContext):
         logger.info('Error while deleting %s from %s' % (chat_id, user_id))
         logger.info(e)
 
+    try:
+        save_ban_statinfo(chat_id, 'entry_captcha_timeout')
+    except Exception as e:
+        logger.info('error during posting stat info')
+        logger.info(e)
+
     logger.info('waiting_dict is %s' % waiting_dict)
     logger.info('%s removed due timeout' % (user_id))
 
@@ -263,6 +275,12 @@ def hodor_watch_the_user(update, context):
             context.bot.deleteMessage(chat_id, message_id)
             logger.info('Chinese user %s with username %s fullname %s has been removed\
                         ' % (user_id, new_member.username, new_member.full_name))
+            try:
+                save_ban_statinfo(chat_id, 'chineese_username')
+            except Exception as e:
+                logger.info('error during posting stat info')
+                logger.info(e)
+
             return
 
         if chat_id not in user_dict.keys():
@@ -357,6 +375,12 @@ def hodor_hold_the_URL_door(update, context):
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
+        try:
+            save_ban_statinfo(chat_id, 'url_from_untrusted_user')
+        except Exception as e:
+            logger.info('error during posting stat info')
+            logger.info(e)
+
 
 
 def get_correct_captcha_answer_idx(captcha, from_user_id):
@@ -418,6 +442,12 @@ def button(update, context):
             user_dict = database.get_user_dict()
 
             try:
+                save_ban_statinfo(chat_id, 'correct_answer')
+            except Exception as e:
+                logger.info('error during posting stat info')
+                logger.info(e)
+
+            try:
                 remove_from_waiting_list(chat_id,
                                          from_user_id,
                                          '',
@@ -425,7 +455,7 @@ def button(update, context):
                 # TODO: call here remove from waiting table too
 
             except Exception as e:
-                logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
+                logger.info('Error while deleting %s from waiting list %s' % (chat_id, from_user_id))
                 logger.info(e)
 
             logger.info('waiting_dict is %s' % waiting_dict)
@@ -461,6 +491,12 @@ def button(update, context):
 
             except Exception as e:
                 logger.info('Error while deleting %s from %s' % (chat_id, from_user_id))
+                logger.info(e)
+
+            try:
+                save_ban_statinfo(chat_id, 'incorrect_answer_entry_captcha')
+            except Exception as e:
+                logger.info('error during posting stat info')
                 logger.info(e)
 
             logger.info('waiting_dict is %s' % waiting_dict)
@@ -544,6 +580,12 @@ def hodor_hold_the_text_door(update, context):
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of link in first message' % (user_id))
+        try:
+            save_ban_statinfo(chat_id, 'chineese_text')
+        except Exception as e:
+            logger.info('error during posting stat info')
+            logger.info(e)
+
         return
 
     if update.message.reply_markup is not None:
@@ -557,6 +599,12 @@ def hodor_hold_the_text_door(update, context):
         context.bot.deleteMessage(chat_id, message_id)
         logger.info('Untrusted user %s has been removed'
                     ' because of keyboard in first message' % (user_id))
+        try:
+            save_ban_statinfo(chat_id, 'keyboard_in_first_msg')
+        except Exception as e:
+            logger.info('error during posting stat info')
+            logger.info(e)
+
 
     if is_Trusted(chat_id, user_id) is False:
         if set_Trusted(chat_id, user_id):

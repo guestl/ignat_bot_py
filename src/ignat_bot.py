@@ -17,7 +17,8 @@ from ignat_db_helper import ignat_db_helper
 
 from handlers.keyboard_captcha import tg_kb_captcha
 from handlers import is_chineese
-from handlers.handlers import has_cyrillic_and_similar_latin
+#from handlers.handlers import has_cyrillic_and_similar_latin
+from handlers.handlers import check_for_bl
 
 from datetime import datetime, timedelta
 from mwt import MWT
@@ -63,7 +64,6 @@ def get_admin_ids(bot, chat_id):
        Results are cached for 1 hour."""
     return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
 
-
 @MWT(timeout=60 * 15)
 def get_blacklist(chat_id):
     """Returns a list of blacklisted words for the chat."""
@@ -71,21 +71,6 @@ def get_blacklist(chat_id):
     with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
         bl_ctx_list = bl_f.read().split('\n')
     return list(filter(None, bl_ctx_list))
-
-
-def check_for_bl(text_from_user, chat_id):
-    if text_from_user is None:
-        return "", False
-    # text_from_user = text_from_user.upper()
-    text_from_user = " ".join(text_from_user.split())
-    word, isSpam = has_cyrillic_and_similar_latin(text_from_user)
-    if isSpam:
-        return word, isSpam
-    for single_black_item in get_blacklist(chat_id):
-        if single_black_item.lower() in text_from_user.lower():
-            return single_black_item, True
-    return "", False
-
 
 def get_admins_usernamelist(bot, chat_id):
     result_list = list()
@@ -95,6 +80,7 @@ def get_admins_usernamelist(bot, chat_id):
         result_list.append('@Yankin66')
         result_list.append('@Life1over')
         result_list.append('@Nataliolsi')
+        result_list.append('@guestl')
     else:
         result_list = get_admin_usernames(bot, chat_id)
 
@@ -667,7 +653,7 @@ def hodor_hold_the_text_door(update, context):
                     ' because of keyboard in first message' % (user_id))
 
     if update.message.text is not None: #and is_Trusted(chat_id, user_id) is not True:
-        bl_word, bl_result = check_for_bl(update.message.text, chat_id) 
+        bl_word, bl_result, reason = check_for_bl(update.message.text, chat_id, get_blacklist(chat_id)) 
         if bl_result:
             logger.info(update.message.text)
             until = datetime.now() + timedelta(seconds=config.kick_bl_timeout)
@@ -681,8 +667,8 @@ def hodor_hold_the_text_door(update, context):
             except Exception as e:
                 logger.error('Can not delete a message in %s' % (chat_id))
                 logger.error(e)
-            logger.info('User %s has been temporarily removed'
-                        ' because of blacklisted word "%s" in the message' % (user_id, bl_word))
+            logger.info('User %s has been temporarily removed "%s"'
+                        ' blacklisted word "%s" in the message' % (user_id, reason, bl_word))
             context.bot.unban_chat_member(chat_id, user_id)
             return
 

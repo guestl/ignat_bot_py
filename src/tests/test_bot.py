@@ -1,5 +1,6 @@
 # run me as "nosetests -v --nocapture --with-coverage --cover-inclusive --cover-package="ignat_bot""
 from nose.tools import *
+from nose import main
 
 # import os
 # import sys
@@ -9,6 +10,7 @@ from emoji import demojize
 
 from handlers import is_chineese
 from handlers.handlers import get_eng_percent
+from handlers.handlers import has_cyrillic_and_similar_latin
 from handlers.keyboard_captcha import tg_kb_captcha
 from ignat_db_helper import ignat_db_helper
 import sqlite3
@@ -59,6 +61,33 @@ class Test_Bot:
         assert get_eng_percent(s_60_russian_string) < 0.5
         assert get_eng_percent(s_lat_string) > 0.8
         assert get_eng_percent(s_russian_string) < 0.2
+
+    def get_blacklist(chat_id):
+        """Returns a list of blacklisted words for the chat."""
+        bl_ctx_list = list()
+        with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
+            bl_ctx_list = bl_f.read().split('\n')
+        return list(filter(None, bl_ctx_list))
+
+    def check_for_bl(text_from_user, chat_id):
+        text_from_user = text_from_user.upper()
+        for single_black_item in get_blacklist(chat_id):
+            if single_black_item.upper() in text_from_user:
+                return True
+        return False
+
+    def test_blacklist(self):
+        s_cleanrus_string = 'Чистая строка'
+        s_cleanlat_string = 'Clean string'
+        s_bl_string1 = 'набор на бесплатный вебинар'
+        s_bl_string2 = 'Набор на бесплатный Вебинар'
+        s_bl_string3 = 'Набор на  бесплатный  Вебинар'
+
+        assert check_for_bl(s_cleanrus_string, '') is False
+        assert check_for_bl(s_cleanlat_string, '') is False
+        assert check_for_bl(s_bl_string1, '') is True
+        assert check_for_bl(s_bl_string2, '') is True
+        assert check_for_bl(s_bl_string3, '') is True
 
     def test_captcha_context(self):
         captcha = tg_kb_captcha().get_today_captcha(4)
@@ -136,4 +165,4 @@ class Test_Bot:
 
 
 if __name__ == '__main__':
-    nose.main()
+    main()

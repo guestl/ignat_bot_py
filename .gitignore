@@ -380,3 +380,6 @@ src/echo_server.py
 src/token.py
 src/tgtoken.py
 src/rr.py
+src/blacklist.sorted.txt
+src/blacklist.txt
+src/sort.ps1
