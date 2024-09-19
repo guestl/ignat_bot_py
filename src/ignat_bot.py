@@ -606,15 +606,19 @@ def hodor_hold_the_text_door(update, context):
     user_id = update.message.from_user.id
     message_id = update.message.message_id
     global user_dict
+    message_text = ''
+    if(update.message.photo and update.message.caption):
+        message_text = update.message.caption
+    elif (not update.message.photo and update.message.text):
+        message_text = update.message.text
     save_message_text_to_database(update.message.chat_id,
                                   update.message.from_user.id,
                                   update.message.from_user.username,
-                                  update.message.text, update.message.caption,
+                                  message_text, update.message.caption,
                                   update.message.parse_entities(),
                                   update.message.caption_entities)
 
-    if ((is_chineese.is_chineese(update.message.text) or
-         is_chineese.is_chineese(update.message.caption)) and
+    if (is_chineese.is_chineese(message_text) and
             is_Trusted(chat_id, user_id) is not True):
         #context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
@@ -652,8 +656,8 @@ def hodor_hold_the_text_door(update, context):
         logger.info('Untrusted user %s has been removed'
                     ' because of keyboard in first message' % (user_id))
 
-    if update.message.text is not None: #and is_Trusted(chat_id, user_id) is not True:
-        bl_word, bl_result, reason = check_for_bl(update.message.text, chat_id, get_blacklist(chat_id)) 
+    if message_text is not None: #and is_Trusted(chat_id, user_id) is not True:
+        bl_word, bl_result, reason = check_for_bl(message_text, chat_id, get_blacklist(chat_id)) 
         if bl_result:
             logger.info(update.message.text)
             until = datetime.now() + timedelta(seconds=config.kick_bl_timeout)
@@ -734,7 +738,7 @@ def main():
                             hodor_hold_the_URL_door))
 
     dispatcher.add_handler(MessageHandler(~Filters.command & 
-                                          (Filters.text | Filters.forwarded),
+                                          (Filters.text | Filters.photo | Filters.forwarded),
                                           hodor_hold_the_text_door))
 
     dispatcher.add_handler(CallbackQueryHandler(button))

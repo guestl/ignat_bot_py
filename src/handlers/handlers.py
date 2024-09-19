@@ -1,5 +1,6 @@
 import string
 
+
 def get_eng_percent(text_to_eval):
     full_len = len(text_to_eval)
     lat_chat_cnt = 0
@@ -8,16 +9,21 @@ def get_eng_percent(text_to_eval):
             lat_chat_cnt += 1
     return lat_chat_cnt / full_len
 
+
 def remove_separators(text):
-    separators = {'-', '.', ',', ':', ';', '"', '/', '\\', '_', '!', '?', '%', '*', '(', ')', '{', '}', '[', ']', '|', '=', '&', '#', '№', '—', '\''}
+    separators = {'-', '.', ',', ':', ';', '"', '/', '\\', '_', '!',
+                  '?', '%', '*', '(', ')', '{', '}', '[', ']', '|',
+                  '=', '&', '#', '№', '—', '\''}
     space_char = ' '
     for separator in separators:
         text = text.replace(separator, space_char)
     return text
 
+
 def has_cyrillic_and_similar_latin(text):
     text = text.lower()
-    similar_latin_chars = {'a', 'e', 'o', 'p', 'c', 'x', 'y', 't', 'u', 'h', 'b', 'k', 'm', 'r', 'l'}
+    similar_latin_chars = {'a', 'e', 'o', 'p', 'c', 'x', 'y', 't', 'u',
+                           'h', 'b', 'k', 'm', 'r', 'l'}
     space_char = ' '
     text = remove_separators(text)
     text_list = text.split(space_char)
@@ -45,8 +51,9 @@ def has_cyrillic_and_similar_latin(text):
 
     return '', False
 
+
 def check_for_bl(text_from_user, chat_id, chat_blacklist):
-    #text_from_user = remove_separators(text_from_user)
+    # text_from_user = remove_separators(text_from_user)
     if text_from_user is None:
         return "", False, None
     # text_from_user = text_from_user.upper()
@@ -58,4 +65,3 @@ def check_for_bl(text_from_user, chat_id, chat_blacklist):
         if single_black_item.lower() in text_from_user.lower():
             return single_black_item, True, "Is in blacklist"
     return "", False, None
-
