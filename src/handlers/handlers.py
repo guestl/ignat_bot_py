@@ -56,12 +56,12 @@ def check_for_bl(text_from_user, chat_id, chat_blacklist):
     # text_from_user = remove_separators(text_from_user)
     if text_from_user is None:
         return "", False, None
-    # text_from_user = text_from_user.upper()
+    text_from_user = text_from_user.lower()
     text_from_user = " ".join(text_from_user.split())
     word, isSpam = has_cyrillic_and_similar_latin(text_from_user)
     if isSpam:
         return word, isSpam, "Mix of latin and cyrillic"
     for single_black_item in chat_blacklist:
-        if single_black_item.lower() in text_from_user.lower():
+        if single_black_item.lower() in text_from_user:
             return single_black_item, True, "Is in blacklist"
     return "", False, None

@@ -17,7 +17,7 @@ from ignat_db_helper import ignat_db_helper
 
 from handlers.keyboard_captcha import tg_kb_captcha
 from handlers import is_chineese
-#from handlers.handlers import has_cyrillic_and_similar_latin
+# from handlers.handlers import has_cyrillic_and_similar_latin
 from handlers.handlers import check_for_bl
 
 from datetime import datetime, timedelta
@@ -26,11 +26,19 @@ from mwt import MWT
 # from emoji import demojize
 from emoji import emojize
 
+from collections import defaultdict
+import threading
+
 # TODO: possibility to change language + admin panel
 # TODO: nextgen captcha
 
 user_dict = {}
 waiting_dict = {}
+
+# Словарь для хранения сообщений по media_group_id
+media_groups = defaultdict(list)
+# Таймеры для отслеживания, когда медиа-группа считается завершенной
+group_timers = {}
 
 database = ignat_db_helper()
 stg_kb_captcha = tg_kb_captcha()
@@ -64,6 +72,7 @@ def get_admin_ids(bot, chat_id):
        Results are cached for 1 hour."""
     return [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
 
+
 @MWT(timeout=60 * 15)
 def get_blacklist(chat_id):
     """Returns a list of blacklisted words for the chat."""
@@ -71,6 +80,7 @@ def get_blacklist(chat_id):
     with open(config.black_list_filename, 'r', encoding='utf-8', errors='replace') as bl_f:
         bl_ctx_list = bl_f.read().split('\n')
     return list(filter(None, bl_ctx_list))
+
 
 def get_admins_usernamelist(bot, chat_id):
     result_list = list()
@@ -158,15 +168,6 @@ def save_message_text_to_database(chat_id, userID, userName, userMessageText,
                                   userMessageCaptionEntities):
     if userMessageText:
         database.save_message(chat_id, userID, userMessageText)
-    # else:
-    #    logger.info('from [%s][%s] was text: %s ' %
-    #                (userID, userName, userMessageText))
-    #    logger.info('from [%s][%s] was caption: %s ' %
-    #                (userID, userName, userMessageCaption))
-    #    logger.info('from [%s][%s] was messageEntities: %s ' %
-    #                (userID, userName, userMessageEntities))
-    #    logger.info('from [%s][%s] was captionEntities: %s ' %
-    #                (userID, userName, userMessageCaptionEntities))
 
 
 def add_user_to_waiting_dict(chat_id, user_id, correct_answer, job_name):
@@ -274,7 +275,7 @@ def hodor_watch_the_user(update, context):
     message_id = update.message.message_id
     global user_dict
 
-    #logger.info(user_dict)
+    # logger.info(user_dict)
 
 #    logger.debug(update.message)
 
@@ -357,6 +358,7 @@ def hodor_watch_the_user(update, context):
                 logger.error('update.message.chat.title = ' + update.message.chat.title)
                 logger.error('update.message.chat.username = ' + update.message.chat.username)
                 logger.error('<< Error while restrict user')
+                logger.error(e)
 
             keyboard = [[InlineKeyboardButton(captcha_emoji[0],
                                               callback_data= config.btnCaptcha +
@@ -426,26 +428,6 @@ def hodor_watch_the_user(update, context):
 
 def hodor_hold_the_URL_door(update, context):
     pass
-#    chat_id = update.message.chat_id
-#    if update.message.from_user is None:
-#        user_id = -1
-#    else:
-#        user_id = update.message.from_user.id
-#    message_id = update.message.message_id
-#    save_message_text_to_database(update.message.chat_id,
-#                                  user_id,
-#                                  update.message.from_user.username,
-#                                  update.message.text, update.message.caption,
-#                                  update.message.parse_entities(),
-#                                  update.message.caption_entities)
-"""
-    if not is_Trusted(chat_id, user_id):
-        until = datetime.now() + timedelta(seconds=config.kick_timeout)
-        context.bot.kick_chat_member(chat_id, user_id, until_date=until)
-        context.bot.deleteMessage(chat_id, message_id)
-        logger.info('Untrusted user %s has been removed'
-                    ' because of link in first message' % (user_id))
-"""
 
 
 def get_correct_captcha_answer_idx(captcha, from_user_id):
@@ -509,6 +491,7 @@ def button(update, context):
                     logger.error('query.message.chat.title = ' + query.message.chat.title)
                     logger.error('query.message.chat.username = ' + query.message.chat.username)
                     logger.error('<< Error while unrestrict user')
+                    logger.error(e)
 
                 logger.debug('Adding %s as trusted' % (from_user_id))
                 if add_Untrusted(chat_id, from_user_id):
@@ -599,6 +582,64 @@ def button(update, context):
             context.bot.answer_callback_query(query.id, text="Удоляет или автор, или одмины")
 
 
+# Функция для удаления спам-групп
+def remove_spam_group(group_id, context):
+    chat_id = media_groups[group_id][0].chat_id
+    # Проверка на спам
+    for msg in media_groups[group_id]:
+        if msg.caption is not None: #and is_Trusted(chat_id, user_id) is not True:
+            logger.info(f'msg.caption ---> {msg.caption}')
+            bl_word, bl_result, reason = check_for_bl(msg.caption, chat_id, get_blacklist(chat_id)) 
+            if bl_result:
+                until = datetime.now() + timedelta(seconds=config.kick_bl_timeout)
+                try:
+                    context.bot.kick_chat_member(chat_id, msg.from_user.id, until_date=until)
+                except Exception as e:
+                    logger.error('Can not kick in %s' % (chat_id))
+                    logger.error(e)
+                try:
+                    # Удаляем все сообщения в группе
+                    for msg in media_groups[group_id]:
+                        context.bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
+                    logger.info(f"Deleted media group {group_id} for spam")
+                    logger.info('User %s has been temporarily removed "%s"'
+                                ' blacklisted word "%s" in the message' % (msg.from_user.id, reason, bl_word))
+                    context.bot.unban_chat_member(chat_id, msg.from_user.id)
+                    break
+                except Exception as e:
+                    logger.error('Can not delete a message in %s' % (chat_id))
+                    logger.error(e)
+
+    # Удаляем группу из памяти
+    del media_groups[group_id]
+    del group_timers[group_id]
+
+
+def hodor_hold_the_photo_door(update, context):
+    message = update.message
+    if message is None:
+        return
+
+    # Проверяем, что сообщение является частью медиа-группы
+    if message.media_group_id:
+        group_id = message.media_group_id
+
+        # Сохраняем сообщение в словарь по media_group_id
+        media_groups[group_id].append(message)
+        logger.info(media_groups)
+
+        # Сбрасываем существующий таймер, если группа еще обновляется
+        if group_id in group_timers:
+            group_timers[group_id].cancel()
+            # logger.info('reset timer')
+
+        # Устанавливаем таймер на 5 секунд (регулируйте время по необходимости)
+        # logger.info('set timer')
+        timer = threading.Timer(5.0, remove_spam_group, [group_id, context])
+        group_timers[group_id] = timer
+        timer.start()
+
+
 def hodor_hold_the_text_door(update, context):
     if update.message is None:
         return
@@ -606,11 +647,7 @@ def hodor_hold_the_text_door(update, context):
     user_id = update.message.from_user.id
     message_id = update.message.message_id
     global user_dict
-    message_text = ''
-    if(update.message.photo and update.message.caption):
-        message_text = update.message.caption
-    elif (not update.message.photo and update.message.text):
-        message_text = update.message.text
+    message_text = update.message.text
     save_message_text_to_database(update.message.chat_id,
                                   update.message.from_user.id,
                                   update.message.from_user.username,
@@ -618,9 +655,9 @@ def hodor_hold_the_text_door(update, context):
                                   update.message.parse_entities(),
                                   update.message.caption_entities)
 
-    if (is_chineese.is_chineese(message_text) and
-            is_Trusted(chat_id, user_id) is not True):
-        #context.bot.delete_message(chat_id, message_id)
+    if (is_chineese.is_chineese(message_text)
+            and is_Trusted(chat_id, user_id) is not True):
+        # context.bot.delete_message(chat_id, message_id)
         until = datetime.now() + timedelta(seconds=config.kick_timeout)
         try:
             context.bot.kick_chat_member(chat_id, user_id, until_date=until)
@@ -731,15 +768,19 @@ def main():
                             hodor_watch_the_user))
 
     dispatcher.add_handler(MessageHandler
-                           (~Filters.command & 
-                            Filters.text & (Filters.entity(MessageEntity.URL) |
-                                            Filters.entity(
+                           (~Filters.command
+                            & Filters.text & (Filters.entity(MessageEntity.URL)
+                                            | Filters.entity(
                                             MessageEntity.TEXT_LINK)),
                             hodor_hold_the_URL_door))
 
-    dispatcher.add_handler(MessageHandler(~Filters.command & 
-                                          (Filters.text | Filters.photo | Filters.forwarded),
+    dispatcher.add_handler(MessageHandler(~Filters.command
+                                          & (Filters.text),
                                           hodor_hold_the_text_door))
+
+    dispatcher.add_handler(MessageHandler(~Filters.command 
+                                          & (Filters.photo | Filters.forwarded),
+                                          hodor_hold_the_photo_door))
 
     dispatcher.add_handler(CallbackQueryHandler(button))
     dispatcher.add_handler(alarm_handler_alrm)
